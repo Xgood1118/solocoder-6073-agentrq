@@ -1,0 +1,1 @@
+createTask 接口必传 createdBy，漏了直接 400。前端调用始终带了，但 MCP 自动创建或者直接调 API 时可能踩到，mapper 层应该默认补 human。检查修复一下。
