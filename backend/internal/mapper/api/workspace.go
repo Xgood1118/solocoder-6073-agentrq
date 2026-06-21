@@ -25,6 +25,7 @@ func FromHTTPRequestToCreateWorkspaceRequestEntity(c *fiber.Ctx) *entity.CreateW
 			NotificationSettings: fromViewNotificationSettingsToEntity(payload.Workspace.NotificationSettings),
 			AllowAllCommands:     payload.Workspace.AllowAllCommands,
 			SelfLearningLoopNote: payload.Workspace.SelfLearningLoopNote,
+			TemplateID:           monoflake.IDFromBase62(payload.Workspace.TemplateID).Int64(),
 		},
 	}
 }
@@ -116,6 +117,7 @@ func FromHTTPRequestToUpdateWorkspaceRequestEntity(c *fiber.Ctx) *entity.UpdateW
 			AutoAllowedTools:     payload.Workspace.AutoAllowedTools,
 			AllowAllCommands:     payload.Workspace.AllowAllCommands,
 			SelfLearningLoopNote: payload.Workspace.SelfLearningLoopNote,
+			TemplateID:           monoflake.IDFromBase62(payload.Workspace.TemplateID).Int64(),
 		},
 	}
 }
@@ -151,6 +153,7 @@ func fromEntityWorkspaceToView(p entity.Workspace, mcpURL string) view.Workspace
 		AutoAllowedTools:     p.AutoAllowedTools,
 		AllowAllCommands:     p.AllowAllCommands,
 		SelfLearningLoopNote: p.SelfLearningLoopNote,
+		TemplateID:           monoflake.ID(p.TemplateID).String(),
 	}
 	if p.Slack != nil {
 		v.Slack = &view.SlackConfig{
@@ -192,4 +195,233 @@ func fromViewNotificationSettingsToEntity(p *view.NotificationSettings) *entity.
 		WorkspaceUnarchived: p.WorkspaceUnarchived,
 		Channels:            p.Channels,
 	}
+}
+
+func FromHTTPRequestToCreateWorkspaceTemplateRequest(c *fiber.Ctx) *entity.CreateWorkspaceTemplateRequest {
+	var payload view.CreateWorkspaceTemplateRequest
+	if err := json.Unmarshal(c.BodyRaw(), &payload); err != nil {
+		return nil
+	}
+	if payload.Template.Name == "" {
+		return nil
+	}
+	return &entity.CreateWorkspaceTemplateRequest{
+		Template: entity.WorkspaceTemplate{
+			Name:                 payload.Template.Name,
+			Description:          payload.Template.Description,
+			ColumnConfig:         payload.Template.ColumnConfig,
+			FilterConfig:         fromViewFilterConfigToEntity(payload.Template.FilterConfig),
+			AutoAllowedTools:     payload.Template.AutoAllowedTools,
+			AllowAllCommands:     payload.Template.AllowAllCommands,
+			NotificationSettings: fromViewNotificationSettingsToEntity(payload.Template.NotificationSettings),
+			SelfLearningLoopNote: payload.Template.SelfLearningLoopNote,
+		},
+	}
+}
+
+func FromCreateWorkspaceTemplateResponseEntityToHTTPResponse(rs *entity.CreateWorkspaceTemplateResponse) []byte {
+	payload, _ := json.Marshal(view.CreateWorkspaceTemplateResponse{
+		Template: fromEntityTemplateToView(rs.Template),
+	})
+	return payload
+}
+
+func FromGetWorkspaceTemplateResponseEntityToHTTPResponse(rs *entity.GetWorkspaceTemplateResponse) []byte {
+	payload, _ := json.Marshal(view.GetWorkspaceTemplateResponse{
+		Template: fromEntityTemplateToView(rs.Template),
+	})
+	return payload
+}
+
+func FromListWorkspaceTemplatesResponseEntityToHTTPResponse(rs *entity.ListWorkspaceTemplatesResponse) []byte {
+	templates := make([]view.WorkspaceTemplate, len(rs.Templates))
+	for i, t := range rs.Templates {
+		templates[i] = fromEntityTemplateToView(t)
+	}
+	payload, _ := json.Marshal(view.ListWorkspaceTemplatesResponse{Templates: templates})
+	return payload
+}
+
+func FromHTTPRequestToUpdateWorkspaceTemplateRequest(c *fiber.Ctx) *entity.UpdateWorkspaceTemplateRequest {
+	id := monoflake.IDFromBase62(c.Params("id")).Int64()
+	if id == 0 {
+		return nil
+	}
+	var payload view.UpdateWorkspaceTemplateRequest
+	if err := json.Unmarshal(c.BodyRaw(), &payload); err != nil {
+		return nil
+	}
+	return &entity.UpdateWorkspaceTemplateRequest{
+		Template: entity.WorkspaceTemplate{
+			ID:                   id,
+			Name:                 payload.Template.Name,
+			Description:          payload.Template.Description,
+			ColumnConfig:         payload.Template.ColumnConfig,
+			FilterConfig:         fromViewFilterConfigToEntity(payload.Template.FilterConfig),
+			AutoAllowedTools:     payload.Template.AutoAllowedTools,
+			AllowAllCommands:     payload.Template.AllowAllCommands,
+			NotificationSettings: fromViewNotificationSettingsToEntity(payload.Template.NotificationSettings),
+			SelfLearningLoopNote: payload.Template.SelfLearningLoopNote,
+		},
+	}
+}
+
+func FromUpdateWorkspaceTemplateResponseEntityToHTTPResponse(rs *entity.UpdateWorkspaceTemplateResponse) []byte {
+	payload, _ := json.Marshal(view.UpdateWorkspaceTemplateResponse{
+		Template: fromEntityTemplateToView(rs.Template),
+	})
+	return payload
+}
+
+func FromHTTPRequestToSaveWorkspaceAsTemplateRequest(c *fiber.Ctx) *entity.SaveWorkspaceAsTemplateRequest {
+	var payload view.SaveWorkspaceAsTemplateRequest
+	if err := json.Unmarshal(c.BodyRaw(), &payload); err != nil {
+		return nil
+	}
+	workspaceID := monoflake.IDFromBase62(payload.WorkspaceID).Int64()
+	if workspaceID == 0 || payload.Name == "" {
+		return nil
+	}
+	return &entity.SaveWorkspaceAsTemplateRequest{
+		WorkspaceID: workspaceID,
+		Name:        payload.Name,
+		Description: payload.Description,
+	}
+}
+
+func FromSaveWorkspaceAsTemplateResponseEntityToHTTPResponse(rs *entity.SaveWorkspaceAsTemplateResponse) []byte {
+	payload, _ := json.Marshal(view.SaveWorkspaceAsTemplateResponse{
+		Template: fromEntityTemplateToView(rs.Template),
+	})
+	return payload
+}
+
+func FromHTTPRequestToApplyTemplateToWorkspaceRequest(c *fiber.Ctx) *entity.ApplyTemplateToWorkspaceRequest {
+	var payload view.ApplyTemplateToWorkspaceRequest
+	if err := json.Unmarshal(c.BodyRaw(), &payload); err != nil {
+		return nil
+	}
+	templateID := monoflake.IDFromBase62(payload.TemplateID).Int64()
+	workspaceID := monoflake.IDFromBase62(payload.WorkspaceID).Int64()
+	if templateID == 0 || workspaceID == 0 {
+		return nil
+	}
+	return &entity.ApplyTemplateToWorkspaceRequest{
+		TemplateID:  templateID,
+		WorkspaceID: workspaceID,
+	}
+}
+
+func FromApplyTemplateToWorkspaceResponseEntityToHTTPResponse(rs *entity.ApplyTemplateToWorkspaceResponse, mcpURL string) []byte {
+	payload, _ := json.Marshal(view.ApplyTemplateToWorkspaceResponse{
+		Workspace: fromEntityWorkspaceToView(rs.Workspace, mcpURL),
+	})
+	return payload
+}
+
+func fromEntityTemplateToView(p entity.WorkspaceTemplate) view.WorkspaceTemplate {
+	return view.WorkspaceTemplate{
+		ID:                   monoflake.ID(p.ID).String(),
+		CreatedAt:            p.CreatedAt,
+		UpdatedAt:            p.UpdatedAt,
+		Name:                 p.Name,
+		Description:          p.Description,
+		ColumnConfig:         p.ColumnConfig,
+		FilterConfig:         p.FilterConfig,
+		AutoAllowedTools:     p.AutoAllowedTools,
+		AllowAllCommands:     p.AllowAllCommands,
+		NotificationSettings: fromEntityNotificationSettingsToView(p.NotificationSettings),
+		SelfLearningLoopNote: p.SelfLearningLoopNote,
+	}
+}
+
+func FromHTTPRequestToCreateCustomFieldRequest(c *fiber.Ctx) *entity.CreateCustomFieldRequest {
+	var payload view.CreateCustomFieldRequest
+	if err := json.Unmarshal(c.BodyRaw(), &payload); err != nil {
+		return nil
+	}
+	workspaceID := monoflake.IDFromBase62(payload.Field.WorkspaceID).Int64()
+	if workspaceID == 0 || payload.Field.Name == "" {
+		return nil
+	}
+	return &entity.CreateCustomFieldRequest{
+		WorkspaceID: workspaceID,
+		Field: entity.CustomFieldDefinition{
+			Name:      payload.Field.Name,
+			FieldType: payload.Field.FieldType,
+			Options:   payload.Field.Options,
+			SortOrder: payload.Field.SortOrder,
+		},
+	}
+}
+
+func FromCreateCustomFieldResponseEntityToHTTPResponse(rs *entity.CreateCustomFieldResponse) []byte {
+	payload, _ := json.Marshal(view.CreateCustomFieldResponse{
+		Field: fromEntityCustomFieldToView(rs.Field),
+	})
+	return payload
+}
+
+func FromListCustomFieldsResponseEntityToHTTPResponse(rs *entity.ListCustomFieldsResponse) []byte {
+	fields := make([]view.CustomFieldDefinition, len(rs.Fields))
+	for i, f := range rs.Fields {
+		fields[i] = fromEntityCustomFieldToView(f)
+	}
+	payload, _ := json.Marshal(view.ListCustomFieldsResponse{Fields: fields})
+	return payload
+}
+
+func FromHTTPRequestToUpdateCustomFieldRequest(c *fiber.Ctx) *entity.UpdateCustomFieldRequest {
+	fieldID := monoflake.IDFromBase62(c.Params("id")).Int64()
+	if fieldID == 0 {
+		return nil
+	}
+	var payload view.UpdateCustomFieldRequest
+	if err := json.Unmarshal(c.BodyRaw(), &payload); err != nil {
+		return nil
+	}
+	workspaceID := monoflake.IDFromBase62(payload.Field.WorkspaceID).Int64()
+	if workspaceID == 0 {
+		return nil
+	}
+	return &entity.UpdateCustomFieldRequest{
+		WorkspaceID: workspaceID,
+		Field: entity.CustomFieldDefinition{
+			ID:          fieldID,
+			Name:        payload.Field.Name,
+			FieldType:   payload.Field.FieldType,
+			Options:     payload.Field.Options,
+			SortOrder:   payload.Field.SortOrder,
+		},
+	}
+}
+
+func FromUpdateCustomFieldResponseEntityToHTTPResponse(rs *entity.UpdateCustomFieldResponse) []byte {
+	payload, _ := json.Marshal(view.UpdateCustomFieldResponse{
+		Field: fromEntityCustomFieldToView(rs.Field),
+	})
+	return payload
+}
+
+func fromEntityCustomFieldToView(p entity.CustomFieldDefinition) view.CustomFieldDefinition {
+	return view.CustomFieldDefinition{
+		ID:          monoflake.ID(p.ID).String(),
+		CreatedAt:   p.CreatedAt,
+		UpdatedAt:   p.UpdatedAt,
+		WorkspaceID: monoflake.ID(p.WorkspaceID).String(),
+		Name:        p.Name,
+		FieldType:   p.FieldType,
+		Options:     p.Options,
+		SortOrder:   p.SortOrder,
+	}
+}
+
+func fromViewFilterConfigToEntity(v any) map[string]any {
+	if v == nil {
+		return nil
+	}
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return nil
 }

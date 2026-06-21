@@ -429,6 +429,176 @@
                   </div>
                 </div>
 
+                <!-- Templates -->
+                <div v-if="activeTab === 'templates'" class="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Workspace Templates</h3>
+                      <span class="text-[9px] font-bold text-gray-400 bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700 uppercase">{{ templates.length }} Saved</span>
+                    </div>
+
+                    <p class="text-[11px] text-gray-500 dark:text-zinc-400 leading-relaxed px-1 font-medium">
+                      Save your current workspace layout as a reusable template, or apply an existing one to quickly configure new workspaces.
+                    </p>
+
+                    <button v-if="!showTemplateForm" type="button" @click="showTemplateForm = true"
+                            class="bg-gray-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-2.5 rounded-sm text-[10px] font-bold hover:bg-black dark:hover:bg-zinc-100 shadow-md transition-all active:scale-95 flex items-center gap-2 uppercase tracking-widest">
+                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4" /></svg>
+                      Save as Template
+                    </button>
+
+                    <div v-if="showTemplateForm" class="bg-gray-50 dark:bg-zinc-800/50 rounded-sm p-5 border border-gray-200 dark:border-zinc-800 space-y-4">
+                      <div class="space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Template Name</label>
+                        <input v-model="templateForm.name" type="text" required placeholder="e.g. Standard Project Setup"
+                               class="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-sm px-4 py-3 text-sm focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none font-bold text-gray-900 dark:text-zinc-100 transition-all shadow-sm" />
+                      </div>
+                      <div class="space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Description</label>
+                        <textarea v-model="templateForm.description" rows="3" placeholder="What does this template include?"
+                                  class="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-sm px-4 py-3 text-sm focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none font-medium text-gray-800 dark:text-zinc-200 transition-all resize-none shadow-sm"></textarea>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <button type="button" @click="handleSaveTemplate" :disabled="savingTemplate"
+                                class="bg-gray-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-2.5 rounded-sm text-[10px] font-bold hover:bg-black dark:hover:bg-zinc-100 shadow-md transition-all active:scale-95 flex items-center gap-2 uppercase tracking-widest">
+                          <svg v-if="savingTemplate" class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+                          {{ savingTemplate ? 'Saving...' : 'Save Template' }}
+                        </button>
+                        <button type="button" @click="showTemplateForm = false; templateForm.name = ''; templateForm.description = ''"
+                                class="px-6 py-2.5 text-[10px] font-bold text-gray-500 dark:text-zinc-400 hover:text-black dark:hover:text-white uppercase tracking-widest transition-all">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+
+                    <div v-if="templates.length > 0" class="grid grid-cols-1 gap-2 mt-4">
+                      <div v-for="tpl in templates" :key="tpl.id" class="flex items-center justify-between p-4 bg-gray-50 dark:bg-zinc-800/50 rounded-sm border border-gray-100 dark:border-zinc-800 group hover:border-gray-900 dark:hover:border-white transition-all shadow-sm">
+                        <div class="flex items-center gap-4 min-w-0">
+                          <div class="p-2 bg-white dark:bg-zinc-800 rounded-sm shadow-sm border border-gray-100 dark:border-zinc-700 shrink-0">
+                            <svg class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z" /></svg>
+                          </div>
+                          <div class="flex flex-col gap-0.5 min-w-0">
+                            <span class="text-xs font-bold text-gray-800 dark:text-zinc-200 truncate">{{ tpl.name }}</span>
+                            <span v-if="tpl.description" class="text-[10px] text-gray-500 dark:text-zinc-500 font-medium truncate">{{ tpl.description }}</span>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <button type="button" @click="handleApplyTemplate(tpl.id)" :disabled="applyingTemplate === tpl.id"
+                                  class="px-3 py-1.5 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-[9px] font-bold text-gray-700 dark:text-zinc-300 hover:border-gray-900 dark:hover:border-white hover:text-black dark:hover:text-white transition-all rounded-sm uppercase tracking-widest flex items-center gap-1">
+                            <svg v-if="applyingTemplate === tpl.id" class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+                            Apply
+                          </button>
+                          <button type="button" @click="handleDeleteTemplate(tpl)" class="text-gray-300 hover:text-red-500 transition-colors p-1.5">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-else-if="!showTemplateForm" class="py-16 border-2 border-dashed border-gray-100 dark:border-zinc-800 rounded-sm flex flex-col items-center justify-center text-center px-8 bg-gray-50/30 dark:bg-zinc-900/30">
+                      <div class="w-12 h-12 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center mb-4 border border-gray-100 dark:border-zinc-700 shadow-sm">
+                        <svg class="w-6 h-6 text-gray-200 dark:text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z" /></svg>
+                      </div>
+                      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-600 uppercase tracking-widest">No templates yet</p>
+                      <p class="text-[11px] text-gray-500 dark:text-zinc-500 mt-2 font-medium">Save your current workspace layout as a reusable template.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Custom Fields -->
+                <div v-if="activeTab === 'customFields'" class="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Custom Fields</h3>
+                      <span class="text-[9px] font-bold text-gray-400 bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700 uppercase">{{ customFields.length }} Fields</span>
+                    </div>
+
+                    <p class="text-[11px] text-gray-500 dark:text-zinc-400 leading-relaxed px-1 font-medium">
+                      Define custom fields to attach structured metadata to tasks within this workspace.
+                    </p>
+
+                    <button v-if="!showCustomFieldForm" type="button" @click="openCustomFieldForm()"
+                            class="bg-gray-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-2.5 rounded-sm text-[10px] font-bold hover:bg-black dark:hover:bg-zinc-100 shadow-md transition-all active:scale-95 flex items-center gap-2 uppercase tracking-widest">
+                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4" /></svg>
+                      Add Field
+                    </button>
+
+                    <div v-if="showCustomFieldForm" class="bg-gray-50 dark:bg-zinc-800/50 rounded-sm p-5 border border-gray-200 dark:border-zinc-800 space-y-4">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                          <label class="block text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Field Name</label>
+                          <input v-model="customFieldForm.name" type="text" required placeholder="e.g. Priority"
+                                 class="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-sm px-4 py-3 text-sm focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none font-bold text-gray-900 dark:text-zinc-100 transition-all shadow-sm" />
+                        </div>
+                        <div class="space-y-2">
+                          <label class="block text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Field Type</label>
+                          <select v-model="customFieldForm.type"
+                                  class="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-sm px-4 py-3 text-sm focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none font-bold text-gray-900 dark:text-zinc-100 transition-all shadow-sm">
+                            <option value="text">Text</option>
+                            <option value="number">Number</option>
+                            <option value="select">Select</option>
+                            <option value="multiselect">Multi-Select</option>
+                            <option value="date">Date</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div v-if="customFieldForm.type === 'select' || customFieldForm.type === 'multiselect'" class="space-y-2">
+                        <label class="block text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Options (comma-separated)</label>
+                        <input v-model="customFieldForm.optionsText" type="text" placeholder="e.g. Low, Medium, High, Critical"
+                               class="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-sm px-4 py-3 text-sm focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none font-bold text-gray-900 dark:text-zinc-100 transition-all shadow-sm" />
+                      </div>
+
+                      <div class="flex items-center gap-3">
+                        <button type="button" @click="handleSaveCustomField" :disabled="savingCustomField"
+                                class="bg-gray-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-2.5 rounded-sm text-[10px] font-bold hover:bg-black dark:hover:bg-zinc-100 shadow-md transition-all active:scale-95 flex items-center gap-2 uppercase tracking-widest">
+                          <svg v-if="savingCustomField" class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+                          {{ editingCustomFieldId ? 'Update Field' : 'Create Field' }}
+                        </button>
+                        <button type="button" @click="cancelCustomFieldForm()"
+                                class="px-6 py-2.5 text-[10px] font-bold text-gray-500 dark:text-zinc-400 hover:text-black dark:hover:text-white uppercase tracking-widest transition-all">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+
+                    <div v-if="customFields.length > 0" class="grid grid-cols-1 gap-2 mt-4">
+                      <div v-for="field in customFields" :key="field.id" class="flex items-center justify-between p-4 bg-gray-50 dark:bg-zinc-800/50 rounded-sm border border-gray-100 dark:border-zinc-800 group hover:border-gray-900 dark:hover:border-white transition-all shadow-sm">
+                        <div class="flex items-center gap-4 min-w-0">
+                          <div class="p-2 bg-white dark:bg-zinc-800 rounded-sm shadow-sm border border-gray-100 dark:border-zinc-700 shrink-0">
+                            <svg v-if="field.type === 'text'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7" /></svg>
+                            <svg v-else-if="field.type === 'number'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
+                            <svg v-else-if="field.type === 'select' || field.type === 'multiselect'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 9l4-4 4 4m0 6l-4 4-4-4" /></svg>
+                            <svg v-else-if="field.type === 'date'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          </div>
+                          <div class="flex flex-col gap-0.5 min-w-0">
+                            <span class="text-xs font-bold text-gray-800 dark:text-zinc-200 truncate">{{ field.name }}</span>
+                            <div class="flex items-center gap-2">
+                              <span class="text-[9px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">{{ field.type }}</span>
+                              <span v-if="field.options && field.options.length" class="text-[9px] text-gray-500 dark:text-zinc-500 font-medium">{{ field.options.join(', ') }}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <button type="button" @click="editCustomField(field)"
+                                  class="px-3 py-1.5 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-[9px] font-bold text-gray-700 dark:text-zinc-300 hover:border-gray-900 dark:hover:border-white hover:text-black dark:hover:text-white transition-all rounded-sm uppercase tracking-widest">
+                            Edit
+                          </button>
+                          <button type="button" @click="handleDeleteCustomField(field)" class="text-gray-300 hover:text-red-500 transition-colors p-1.5">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-else-if="!showCustomFieldForm" class="py-16 border-2 border-dashed border-gray-100 dark:border-zinc-800 rounded-sm flex flex-col items-center justify-center text-center px-8 bg-gray-50/30 dark:bg-zinc-900/30">
+                      <div class="w-12 h-12 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center mb-4 border border-gray-100 dark:border-zinc-700 shadow-sm">
+                        <svg class="w-6 h-6 text-gray-200 dark:text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                      </div>
+                      <p class="text-[10px] font-bold text-gray-400 dark:text-zinc-600 uppercase tracking-widest">No custom fields</p>
+                      <p class="text-[11px] text-gray-500 dark:text-zinc-500 mt-2 font-medium">Add custom fields to attach structured metadata to tasks.</p>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Danger Zone -->
                 <div v-if="activeTab === 'danger'" class="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <div class="space-y-4">
@@ -457,7 +627,7 @@
               </div>
 
               <!-- Action Bar Footer -->
-              <div v-if="activeTab !== 'setup' && activeTab !== 'slack'" class="px-8 py-6 bg-gray-50/50 dark:bg-zinc-800/50 border-t border-gray-100 dark:border-zinc-800 flex justify-end gap-3">
+              <div v-if="activeTab !== 'setup' && activeTab !== 'slack' && activeTab !== 'templates' && activeTab !== 'customFields'" class="px-8 py-6 bg-gray-50/50 dark:bg-zinc-800/50 border-t border-gray-100 dark:border-zinc-800 flex justify-end gap-3">
                 <button type="button" @click="router.back()" class="px-6 py-2.5 text-[10px] font-bold text-gray-500 dark:text-zinc-400 hover:text-black dark:hover:text-white uppercase tracking-widest transition-all">Cancel</button>
                 <button type="submit" class="bg-gray-900 dark:bg-white text-white dark:text-zinc-900 px-10 py-2.5 rounded-sm text-[10px] font-bold hover:bg-black dark:hover:bg-zinc-100 shadow-xl shadow-black/10 transition-all active:scale-95 flex items-center gap-2 uppercase tracking-widest" :disabled="saving">
                   <svg v-if="saving" class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 12a8 8 0 018-8v8H4z" /></svg>
@@ -485,13 +655,27 @@
       @close="showDeleteConfirm = false"
       @confirm="doDelete"
     />
+    <DeleteModal
+      :show="showDeleteTemplateConfirm"
+      title="Delete Template"
+      :message="`Are you sure you want to delete the template '${deleteTemplateTarget?.name}'? This cannot be undone.`"
+      @close="showDeleteTemplateConfirm = false; deleteTemplateTarget = null"
+      @confirm="doDeleteTemplate"
+    />
+    <DeleteModal
+      :show="showDeleteCustomFieldConfirm"
+      title="Delete Custom Field"
+      :message="`Are you sure you want to delete the custom field '${deleteCustomFieldTarget?.name}'? Existing task data using this field will be preserved but the field will no longer appear in forms.`"
+      @close="showDeleteCustomFieldConfirm = false; deleteCustomFieldTarget = null"
+      @confirm="doDeleteCustomField"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getWorkspace, updateWorkspace, archiveWorkspace, unarchiveWorkspace, deleteWorkspace, getWorkspaceToken, setWorkspaceSlackChannel, removeWorkspaceSlackChannel } from '../api';
+import { getWorkspace, updateWorkspace, archiveWorkspace, unarchiveWorkspace, deleteWorkspace, getWorkspaceToken, setWorkspaceSlackChannel, removeWorkspaceSlackChannel, fetchTemplates, saveWorkspaceAsTemplate, deleteTemplate, applyTemplateToWorkspace, fetchCustomFields, createCustomField, updateCustomField, deleteCustomField } from '../api';
 import { useToasts } from '../composables/useToasts';
 import { usePushNotifications } from '../composables/usePushNotifications';
 import ArchiveModal from '../components/ArchiveModal.vue';
@@ -525,6 +709,22 @@ const slackForm = ref({
 const linkingSlack = ref(false);
 const slackError = ref('');
 const showManualForm = ref(false);
+
+const templates = ref([]);
+const showTemplateForm = ref(false);
+const templateForm = ref({ name: '', description: '' });
+const savingTemplate = ref(false);
+const applyingTemplate = ref(null);
+const showDeleteTemplateConfirm = ref(false);
+const deleteTemplateTarget = ref(null);
+
+const customFields = ref([]);
+const showCustomFieldForm = ref(false);
+const customFieldForm = ref({ name: '', type: 'text', optionsText: '' });
+const editingCustomFieldId = ref(null);
+const savingCustomField = ref(false);
+const showDeleteCustomFieldConfirm = ref(false);
+const deleteCustomFieldTarget = ref(null);
 
 const { checkWorkspaceSubscription, subscribeWorkspace, unsubscribeWorkspace } = usePushNotifications();
 const isPushSubscribed = ref(false);
@@ -684,7 +884,9 @@ const navItems = [
   { id: 'setup', label: 'Setup', icon: `<svg viewBox="0 0 16 17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1.62524 8.11636L7.6712 2.07042C8.50598 1.23564 9.85941 1.23564 10.6941 2.07042C11.5289 2.90518 11.5289 4.25861 10.6941 5.09339L6.12821 9.65934" stroke="currentColor"></path><path d="M6.19116 9.59684L10.6941 5.09385C11.5289 4.25908 12.8823 4.25908 13.7171 5.09385L13.7486 5.12534C14.5834 5.96011 14.5834 7.31354 13.7486 8.14831L8.28059 13.6164C8.00233 13.8946 8.00233 14.3457 8.28059 14.6239L9.40336 15.7468" stroke="currentColor"></path><path d="M9.18266 3.58203L4.71116 8.05351C3.87639 8.88826 3.87639 10.2417 4.71116 11.0765C5.54593 11.9112 6.89936 11.9112 7.73414 11.0765L12.2056 6.605" stroke="currentColor"></path></svg>` },
   { id: 'automations', label: 'Automations', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
   { id: 'notifications', label: 'Notifications', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
-  { id: 'slack', label: 'Slack', icon: `<svg viewBox="0 0 127 127" fill="currentColor"><path d="M27.2 80c0 7.3-5.9 13.2-13.2 13.2C6.7 93.2.8 87.3.8 80c0-7.3 5.9-13.2 13.2-13.2h13.2V80zm6.6 0c0-7.3 5.9-13.2 13.2-13.2 7.3 0 13.2 5.9 13.2 13.2v33c0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V80zM47 27.2c-7.3 0-13.2-5.9-13.2-13.2C33.8 6.7 39.7.8 47 .8c7.3 0 13.2 5.9 13.2 13.2V27.2H47zm0 6.6c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H14c-7.3 0-13.2-5.9-13.2-13.2 0-7.3 5.9-13.2 13.2-13.2h33zM99.8 47c0-7.3 5.9-13.2 13.2-13.2 7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H99.8V47zm-6.6 0c0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V14c0-7.3 5.9-13.2 13.2-13.2 7.3 0 13.2 5.9 13.2 13.2v33zM80 99.8c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V99.8H80zm0-6.6c-7.3 0-13.2-5.9-13.2-13.2 0-7.3 5.9-13.2 13.2-13.2h33c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H80z"/></svg>` }
+  { id: 'slack', label: 'Slack', icon: `<svg viewBox="0 0 127 127" fill="currentColor"><path d="M27.2 80c0 7.3-5.9 13.2-13.2 13.2C6.7 93.2.8 87.3.8 80c0-7.3 5.9-13.2 13.2-13.2h13.2V80zm6.6 0c0-7.3 5.9-13.2 13.2-13.2 7.3 0 13.2 5.9 13.2 13.2v33c0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V80zM47 27.2c-7.3 0-13.2-5.9-13.2-13.2C33.8 6.7 39.7.8 47 .8c7.3 0 13.2 5.9 13.2 13.2V27.2H47zm0 6.6c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H14c-7.3 0-13.2-5.9-13.2-13.2 0-7.3 5.9-13.2 13.2-13.2h33zM99.8 47c0-7.3 5.9-13.2 13.2-13.2 7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H99.8V47zm-6.6 0c0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V14c0-7.3 5.9-13.2 13.2-13.2 7.3 0 13.2 5.9 13.2 13.2v33zM80 99.8c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2-7.3 0-13.2-5.9-13.2-13.2V99.8H80zm0-6.6c-7.3 0-13.2-5.9-13.2-13.2 0-7.3 5.9-13.2 13.2-13.2h33c7.3 0 13.2 5.9 13.2 13.2 0 7.3-5.9 13.2-13.2 13.2H80z"/></svg>` },
+  { id: 'templates', label: 'Templates', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
+  { id: 'customFields', label: 'Custom Fields', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' }
 ];
 
 const eventTypes = [
@@ -856,8 +1058,151 @@ function getShellPattern(tool) {
   return pattern === '*' ? 'all commands' : pattern;
 }
 
+async function loadTemplates() {
+  try {
+    const res = await fetchTemplates();
+    templates.value = res.templates || [];
+  } catch (err) {
+    notifyError('Failed to load templates: ' + err.message);
+  }
+}
+
+async function handleSaveTemplate() {
+  if (!templateForm.value.name.trim()) {
+    notifyError('Template name is required');
+    return;
+  }
+  savingTemplate.value = true;
+  try {
+    await saveWorkspaceAsTemplate(workspaceId.value, templateForm.value.name, templateForm.value.description);
+    notifySuccess('Template saved successfully');
+    showTemplateForm.value = false;
+    templateForm.value = { name: '', description: '' };
+    await loadTemplates();
+  } catch (err) {
+    notifyError('Failed to save template: ' + err.message);
+  } finally {
+    savingTemplate.value = false;
+  }
+}
+
+function handleDeleteTemplate(tpl) {
+  deleteTemplateTarget.value = tpl;
+  showDeleteTemplateConfirm.value = true;
+}
+
+async function doDeleteTemplate() {
+  showDeleteTemplateConfirm.value = false;
+  try {
+    await deleteTemplate(deleteTemplateTarget.value.id);
+    notifySuccess('Template deleted');
+    await loadTemplates();
+  } catch (err) {
+    notifyError('Failed to delete template: ' + err.message);
+  } finally {
+    deleteTemplateTarget.value = null;
+  }
+}
+
+async function handleApplyTemplate(templateId) {
+  applyingTemplate.value = templateId;
+  try {
+    await applyTemplateToWorkspace(workspaceId.value, templateId);
+    notifySuccess('Template applied successfully');
+    await load();
+  } catch (err) {
+    notifyError('Failed to apply template: ' + err.message);
+  } finally {
+    applyingTemplate.value = null;
+  }
+}
+
+async function loadCustomFields() {
+  try {
+    const res = await fetchCustomFields(workspaceId.value);
+    customFields.value = res.customFields || [];
+  } catch (err) {
+    notifyError('Failed to load custom fields: ' + err.message);
+  }
+}
+
+function openCustomFieldForm() {
+  editingCustomFieldId.value = null;
+  customFieldForm.value = { name: '', type: 'text', optionsText: '' };
+  showCustomFieldForm.value = true;
+}
+
+function editCustomField(field) {
+  editingCustomFieldId.value = field.id;
+  customFieldForm.value = {
+    name: field.name,
+    type: field.type,
+    optionsText: (field.options || []).join(', ')
+  };
+  showCustomFieldForm.value = true;
+}
+
+function cancelCustomFieldForm() {
+  showCustomFieldForm.value = false;
+  editingCustomFieldId.value = null;
+  customFieldForm.value = { name: '', type: 'text', optionsText: '' };
+}
+
+function parseOptions(optionsText, type) {
+  if (type !== 'select' && type !== 'multiselect') return [];
+  return optionsText.split(',').map(o => o.trim()).filter(Boolean);
+}
+
+async function handleSaveCustomField() {
+  if (!customFieldForm.value.name.trim()) {
+    notifyError('Field name is required');
+    return;
+  }
+  savingCustomField.value = true;
+  try {
+    const payload = {
+      name: customFieldForm.value.name,
+      type: customFieldForm.value.type,
+      options: parseOptions(customFieldForm.value.optionsText, customFieldForm.value.type)
+    };
+    if (editingCustomFieldId.value) {
+      await updateCustomField(workspaceId.value, editingCustomFieldId.value, payload);
+      notifySuccess('Custom field updated');
+    } else {
+      await createCustomField(workspaceId.value, payload);
+      notifySuccess('Custom field created');
+    }
+    cancelCustomFieldForm();
+    await loadCustomFields();
+  } catch (err) {
+    notifyError('Failed to save custom field: ' + err.message);
+  } finally {
+    savingCustomField.value = false;
+  }
+}
+
+function handleDeleteCustomField(field) {
+  deleteCustomFieldTarget.value = field;
+  showDeleteCustomFieldConfirm.value = true;
+}
+
+async function doDeleteCustomField() {
+  showDeleteCustomFieldConfirm.value = false;
+  try {
+    await deleteCustomField(workspaceId.value, deleteCustomFieldTarget.value.id);
+    notifySuccess('Custom field deleted');
+    await loadCustomFields();
+  } catch (err) {
+    notifyError('Failed to delete custom field: ' + err.message);
+  } finally {
+    deleteCustomFieldTarget.value = null;
+  }
+}
+
 onMounted(() => {
   load();
+  loadTemplates();
+  loadCustomFields();
   if (route.query.tab) {
     activeTab.value = route.query.tab;
   }
@@ -869,5 +1214,11 @@ onMounted(() => {
     const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.hash;
     window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
   }
+});
+
+watch(workspaceId, () => {
+  load();
+  loadTemplates();
+  loadCustomFields();
 });
 </script>

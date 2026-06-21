@@ -5,12 +5,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 
 	entity "github.com/agentrq/agentrq/backend/internal/data/entity/crud"
 	"github.com/agentrq/agentrq/backend/internal/data/model"
 	"github.com/agentrq/agentrq/backend/internal/repository/dbconn"
 	"gorm.io/gorm"
 )
+
+var customFieldKeyRe = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
+func sanitizeCustomFieldKey(key string) string {
+	if customFieldKeyRe.MatchString(key) {
+		return key
+	}
+	return ""
+}
 
 var ErrNotFound = errors.New("not found")
 
@@ -67,6 +78,21 @@ type Repository interface {
 	DeletePushSubscriptionByWorkspace(ctx context.Context, userID int64, workspaceID int64, endpoint string) error
 	GetPushSubscriptionForWorkspace(ctx context.Context, userID int64, workspaceID int64, endpoint string) (bool, error)
 	ListPushSubscriptionsByUserAndWorkspace(ctx context.Context, userID int64, workspaceID int64) ([]model.PushSubscription, error)
+
+	// WorkspaceTemplate
+	CreateWorkspaceTemplate(ctx context.Context, t model.WorkspaceTemplate) (model.WorkspaceTemplate, error)
+	GetWorkspaceTemplate(ctx context.Context, id int64, userID int64) (model.WorkspaceTemplate, error)
+	ListWorkspaceTemplates(ctx context.Context, userID int64) ([]model.WorkspaceTemplate, error)
+	UpdateWorkspaceTemplate(ctx context.Context, t model.WorkspaceTemplate) (model.WorkspaceTemplate, error)
+	DeleteWorkspaceTemplate(ctx context.Context, id int64, userID int64) error
+
+	// CustomField
+	CreateCustomField(ctx context.Context, f model.CustomField) (model.CustomField, error)
+	GetCustomField(ctx context.Context, id int64, workspaceID int64) (model.CustomField, error)
+	ListCustomFields(ctx context.Context, workspaceID int64) ([]model.CustomField, error)
+	UpdateCustomField(ctx context.Context, f model.CustomField) (model.CustomField, error)
+	DeleteCustomField(ctx context.Context, id int64, workspaceID int64) error
+	ClearCustomFieldFromTasks(ctx context.Context, workspaceID int64, fieldKey string) error
 }
 
 type repository struct {
@@ -194,8 +220,38 @@ func (r *repository) ListTasks(ctx context.Context, req entity.ListTasksRequest,
 		q = q.Where("id IN (SELECT task_id FROM messages m1 WHERE created_at = (SELECT MAX(created_at) FROM messages m2 WHERE m2.task_id = m1.task_id) AND " + metadataExpr + ")")
 	}
 
+	if len(req.CustomFieldFilter) > 0 {
+		dialect := r.conn(ctx).Dialector.Name()
+		for key, val := range req.CustomFieldFilter {
+			cleanKey := sanitizeCustomFieldKey(key)
+			if cleanKey == "" {
+				continue
+			}
+			strVal := fmt.Sprintf("%v", val)
+			if dialect == "sqlite" {
+				q = q.Where(fmt.Sprintf("json_extract(custom_fields, '$.%s') = ?", cleanKey), strVal)
+			} else {
+				q = q.Where(fmt.Sprintf("custom_fields::jsonb->>'%s' = ?", cleanKey), strVal)
+			}
+		}
+	}
+
 	orderBy := "created_at desc"
-	if req.Filter == "pending_approval" {
+	if req.CustomFieldSort != "" {
+		cleanKey := sanitizeCustomFieldKey(req.CustomFieldSort)
+		if cleanKey != "" {
+			dialect := r.conn(ctx).Dialector.Name()
+			dir := "ASC"
+			if strings.EqualFold(req.CustomFieldSortDir, "desc") {
+				dir = "DESC"
+			}
+			if dialect == "sqlite" {
+				orderBy = fmt.Sprintf("json_extract(custom_fields, '$.%s') %s", cleanKey, dir)
+			} else {
+				orderBy = fmt.Sprintf("(custom_fields::jsonb->>'%s') %s", cleanKey, dir)
+			}
+		}
+	} else if req.Filter == "pending_approval" {
 		orderBy = "created_at asc"
 	} else if len(req.Status) > 1 {
 		// Mixed statuses, likely "active" view (ongoing, blocked, notstarted, cron)
@@ -723,4 +779,118 @@ func (r *repository) ListPushSubscriptionsByUserAndWorkspace(ctx context.Context
 	var subs []model.PushSubscription
 	err := r.conn(ctx).Where("user_id = ? AND workspace_id = ?", userID, workspaceID).Find(&subs).Error
 	return subs, err
+}
+
+// ── WorkspaceTemplates ────────────────────────────────────────────────────────
+
+func (r *repository) CreateWorkspaceTemplate(ctx context.Context, t model.WorkspaceTemplate) (model.WorkspaceTemplate, error) {
+	if err := r.conn(ctx).Create(&t).Error; err != nil {
+		return model.WorkspaceTemplate{}, err
+	}
+	return t, nil
+}
+
+func (r *repository) GetWorkspaceTemplate(ctx context.Context, id int64, userID int64) (model.WorkspaceTemplate, error) {
+	var t model.WorkspaceTemplate
+	err := r.conn(ctx).Where("id = ? AND user_id = ?", id, userID).First(&t).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.WorkspaceTemplate{}, ErrNotFound
+	}
+	return t, err
+}
+
+func (r *repository) ListWorkspaceTemplates(ctx context.Context, userID int64) ([]model.WorkspaceTemplate, error) {
+	var templates []model.WorkspaceTemplate
+	err := r.conn(ctx).Where("user_id = ?", userID).Order("created_at desc").Find(&templates).Error
+	return templates, err
+}
+
+func (r *repository) UpdateWorkspaceTemplate(ctx context.Context, t model.WorkspaceTemplate) (model.WorkspaceTemplate, error) {
+	if err := r.conn(ctx).Save(&t).Error; err != nil {
+		return model.WorkspaceTemplate{}, err
+	}
+	return t, nil
+}
+
+func (r *repository) DeleteWorkspaceTemplate(ctx context.Context, id int64, userID int64) error {
+	res := r.conn(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.WorkspaceTemplate{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ── CustomFields ──────────────────────────────────────────────────────────────
+
+func (r *repository) CreateCustomField(ctx context.Context, f model.CustomField) (model.CustomField, error) {
+	if err := r.conn(ctx).Create(&f).Error; err != nil {
+		return model.CustomField{}, err
+	}
+	return f, nil
+}
+
+func (r *repository) GetCustomField(ctx context.Context, id int64, workspaceID int64) (model.CustomField, error) {
+	var f model.CustomField
+	err := r.conn(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&f).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.CustomField{}, ErrNotFound
+	}
+	return f, err
+}
+
+func (r *repository) ListCustomFields(ctx context.Context, workspaceID int64) ([]model.CustomField, error) {
+	var fields []model.CustomField
+	err := r.conn(ctx).Where("workspace_id = ?", workspaceID).Order("sort_order asc, id asc").Find(&fields).Error
+	return fields, err
+}
+
+func (r *repository) UpdateCustomField(ctx context.Context, f model.CustomField) (model.CustomField, error) {
+	if err := r.conn(ctx).Save(&f).Error; err != nil {
+		return model.CustomField{}, err
+	}
+	return f, nil
+}
+
+func (r *repository) DeleteCustomField(ctx context.Context, id int64, workspaceID int64) error {
+	res := r.conn(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.CustomField{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *repository) ClearCustomFieldFromTasks(ctx context.Context, workspaceID int64, fieldKey string) error {
+	var tasks []model.Task
+	if err := r.conn(ctx).
+		Where("workspace_id = ? AND custom_fields IS NOT NULL", workspaceID).
+		Find(&tasks).Error; err != nil {
+		return err
+	}
+	for _, t := range tasks {
+		if len(t.CustomFields) == 0 {
+			continue
+		}
+		var fields map[string]any
+		if err := json.Unmarshal(t.CustomFields, &fields); err != nil {
+			continue
+		}
+		if _, exists := fields[fieldKey]; !exists {
+			continue
+		}
+		delete(fields, fieldKey)
+		updated, err := json.Marshal(fields)
+		if err != nil {
+			continue
+		}
+		if err := r.conn(ctx).Model(&model.Task{}).Where("id = ?", t.ID).Update("custom_fields", updated).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

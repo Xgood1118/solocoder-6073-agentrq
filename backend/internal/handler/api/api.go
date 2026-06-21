@@ -106,6 +106,8 @@ func New(p Params) (Handler, error) {
 	if err := h.registerTaskRoutes(); err != nil {
 		return nil, err
 	}
+	h.registerTemplateRoutes()
+	h.registerCustomFieldRoutes()
 	if p.PushCtrl != nil {
 		h.registerPushRoutes(p.PushCtrl)
 	}
@@ -776,5 +778,302 @@ func (h *handler) enrichWorkspaceSlack(ctx context.Context, ws *entity.Workspace
 	cfg, err := h.slackCtrl.GetWorkspaceSlackConfig(ctx, ws.ID)
 	if err == nil && cfg != nil {
 		ws.Slack = cfg
+	}
+}
+
+// ── Templates ────────────────────────────────────────────────────────────────
+
+func (h *handler) registerTemplateRoutes() {
+	r := h.router.Group("/templates")
+	r.Post("", h.createWorkspaceTemplate())
+	r.Get("", h.listWorkspaceTemplates())
+	r.Get("/:id", h.getWorkspaceTemplate())
+	r.Patch("/:id", h.updateWorkspaceTemplate())
+	r.Delete("/:id", h.deleteWorkspaceTemplate())
+	r.Post("/save", h.saveWorkspaceAsTemplate())
+	r.Post("/apply", h.applyTemplateToWorkspace())
+}
+
+func (h *handler) createWorkspaceTemplate() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		rq := mapper.FromHTTPRequestToCreateWorkspaceTemplateRequest(c)
+		if rq == nil {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		rq.UserID = c.Locals("user_id").(string)
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.CreateWorkspaceTemplate(ctx, *rq)
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to create workspace template")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusCreated)
+		return c.Send(mapper.FromCreateWorkspaceTemplateResponseEntityToHTTPResponse(rs))
+	}
+}
+
+func (h *handler) listWorkspaceTemplates() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.ListWorkspaceTemplates(ctx, entity.ListWorkspaceTemplatesRequest{
+			UserID: c.Locals("user_id").(string),
+		})
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to list workspace templates")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusOK)
+		return c.Send(mapper.FromListWorkspaceTemplatesResponseEntityToHTTPResponse(rs))
+	}
+}
+
+func (h *handler) getWorkspaceTemplate() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		rq := &entity.GetWorkspaceTemplateRequest{
+			ID:     monoflake.IDFromBase62(c.Params("id")).Int64(),
+			UserID: c.Locals("user_id").(string),
+		}
+		if rq.ID == 0 {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.GetWorkspaceTemplate(ctx, *rq)
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to get workspace template")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusOK)
+		return c.Send(mapper.FromGetWorkspaceTemplateResponseEntityToHTTPResponse(rs))
+	}
+}
+
+func (h *handler) updateWorkspaceTemplate() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		rq := mapper.FromHTTPRequestToUpdateWorkspaceTemplateRequest(c)
+		if rq == nil {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		rq.UserID = c.Locals("user_id").(string)
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.UpdateWorkspaceTemplate(ctx, *rq)
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to update workspace template")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusOK)
+		return c.Send(mapper.FromUpdateWorkspaceTemplateResponseEntityToHTTPResponse(rs))
+	}
+}
+
+func (h *handler) deleteWorkspaceTemplate() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id := monoflake.IDFromBase62(c.Params("id")).Int64()
+		if id == 0 {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		ctx, cancel := newContext(c)
+		defer cancel()
+		if err := h.crud.DeleteWorkspaceTemplate(ctx, entity.DeleteWorkspaceTemplateRequest{
+			ID:     id,
+			UserID: c.Locals("user_id").(string),
+		}); err != nil {
+			zlog.Error().Err(err).Msg("Failed to delete workspace template")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusNoContent)
+		return c.Send([]byte(""))
+	}
+}
+
+func (h *handler) saveWorkspaceAsTemplate() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		rq := mapper.FromHTTPRequestToSaveWorkspaceAsTemplateRequest(c)
+		if rq == nil {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		rq.UserID = c.Locals("user_id").(string)
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.SaveWorkspaceAsTemplate(ctx, *rq)
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to save workspace as template")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusCreated)
+		return c.Send(mapper.FromSaveWorkspaceAsTemplateResponseEntityToHTTPResponse(rs))
+	}
+}
+
+func (h *handler) applyTemplateToWorkspace() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		rq := mapper.FromHTTPRequestToApplyTemplateToWorkspaceRequest(c)
+		if rq == nil {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		rq.UserID = c.Locals("user_id").(string)
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.ApplyTemplateToWorkspace(ctx, *rq)
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to apply template to workspace")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		rs.Workspace.AgentConnected = h.mcpManager.IsAgentConnected(rs.Workspace.ID)
+		h.enrichWorkspaceSlack(ctx, &rs.Workspace)
+		token := ""
+		if rs.Workspace.TokenEncrypted != "" {
+			dec, _ := security.Decrypt(rs.Workspace.TokenEncrypted, h.tokenKey, rs.Workspace.TokenNonce)
+			token = dec
+		}
+		c.Status(http.StatusOK)
+		return c.Send(mapper.FromApplyTemplateToWorkspaceResponseEntityToHTTPResponse(rs, h.mcpURL(rs.Workspace.ID, token)))
+	}
+}
+
+// ── Custom Fields ────────────────────────────────────────────────────────────
+
+func (h *handler) registerCustomFieldRoutes() {
+	r := h.router.Group("/workspaces/:workspaceId/custom-fields")
+	r.Post("", h.createCustomField())
+	r.Get("", h.listCustomFields())
+	r.Patch("/:fieldId", h.updateCustomField())
+	r.Delete("/:fieldId", h.deleteCustomField())
+}
+
+func (h *handler) createCustomField() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		workspaceID := monoflake.IDFromBase62(c.Params("workspaceId")).Int64()
+		if workspaceID == 0 {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		rq := mapper.FromHTTPRequestToCreateCustomFieldRequest(c)
+		if rq == nil {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		rq.WorkspaceID = workspaceID
+		rq.UserID = c.Locals("user_id").(string)
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.CreateCustomField(ctx, *rq)
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to create custom field")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusCreated)
+		return c.Send(mapper.FromCreateCustomFieldResponseEntityToHTTPResponse(rs))
+	}
+}
+
+func (h *handler) listCustomFields() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		workspaceID := monoflake.IDFromBase62(c.Params("workspaceId")).Int64()
+		if workspaceID == 0 {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.GetCustomFields(ctx, entity.ListCustomFieldsRequest{
+			WorkspaceID: workspaceID,
+			UserID:      c.Locals("user_id").(string),
+		})
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to list custom fields")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusOK)
+		return c.Send(mapper.FromListCustomFieldsResponseEntityToHTTPResponse(rs))
+	}
+}
+
+func (h *handler) updateCustomField() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set(_headerContentType, _mimeJSON)
+		workspaceID := monoflake.IDFromBase62(c.Params("workspaceId")).Int64()
+		if workspaceID == 0 {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		rq := mapper.FromHTTPRequestToUpdateCustomFieldRequest(c)
+		if rq == nil {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		rq.WorkspaceID = workspaceID
+		rq.UserID = c.Locals("user_id").(string)
+		ctx, cancel := newContext(c)
+		defer cancel()
+		rs, err := h.crud.UpdateCustomField(ctx, *rq)
+		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to update custom field")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusOK)
+		return c.Send(mapper.FromUpdateCustomFieldResponseEntityToHTTPResponse(rs))
+	}
+}
+
+func (h *handler) deleteCustomField() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		workspaceID := monoflake.IDFromBase62(c.Params("workspaceId")).Int64()
+		fieldID := monoflake.IDFromBase62(c.Params("fieldId")).Int64()
+		if workspaceID == 0 || fieldID == 0 {
+			c.Status(http.StatusUnprocessableEntity)
+			return c.Send(_invalidPayload)
+		}
+		ctx, cancel := newContext(c)
+		defer cancel()
+		if err := h.crud.DeleteCustomField(ctx, entity.DeleteCustomFieldRequest{
+			WorkspaceID: workspaceID,
+			FieldID:     fieldID,
+			UserID:      c.Locals("user_id").(string),
+		}); err != nil {
+			zlog.Error().Err(err).Msg("Failed to delete custom field")
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
+		}
+		c.Status(http.StatusNoContent)
+		return c.Send([]byte(""))
 	}
 }

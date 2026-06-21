@@ -36,6 +36,7 @@ type (
 		AllowAllCommands     bool
 		SelfLearningLoopNote string
 		Slack                *SlackConfig
+		TemplateID           int64
 	}
 
 	// SlackConfig holds the Slack channel linked to a workspace.
@@ -170,6 +171,7 @@ type (
 		ParentID         int64
 		SortOrder        float64
 		AllowAllCommands bool
+		CustomFields     map[string]any
 	}
 
 	CreateTaskRequest struct {
@@ -192,14 +194,17 @@ type (
 	}
 
 	ListTasksRequest struct {
-		WorkspaceID     int64
-		CreatedBy       string   // optional filter
-		Status          []string // optional filter
-		Filter          string   // e.g. "pending_approval"
-		Limit           int
-		Offset          int
-		UserID          string
-		PreloadMessages bool
+		WorkspaceID       int64
+		CreatedBy         string   // optional filter
+		Status            []string // optional filter
+		Filter            string   // e.g. "pending_approval"
+		Limit             int
+		Offset            int
+		UserID            string
+		PreloadMessages   bool
+		CustomFieldFilter map[string]any  // optional filter by custom field key=value
+		CustomFieldSort   string          // optional: custom field key to sort by
+		CustomFieldSortDir string         // optional: "asc" or "desc" (default "asc")
 	}
 
 	ListTasksResponse struct {
@@ -419,6 +424,133 @@ type (
 		UserID      int64
 		WorkspaceID int64
 		Endpoint    string
+	}
+
+	// WorkspaceTemplate entities
+
+	WorkspaceTemplate struct {
+		ID                   int64
+		CreatedAt            time.Time
+		UpdatedAt            time.Time
+		UserID               int64
+		Name                 string
+		Description          string
+		ColumnConfig         []string
+		FilterConfig         map[string]any
+		AutoAllowedTools     []string
+		AllowAllCommands     bool
+		NotificationSettings *NotificationSettings
+		SelfLearningLoopNote string
+	}
+
+	CreateWorkspaceTemplateRequest struct {
+		Template WorkspaceTemplate
+		UserID   string
+	}
+
+	CreateWorkspaceTemplateResponse struct {
+		Template WorkspaceTemplate
+	}
+
+	GetWorkspaceTemplateRequest struct {
+		ID     int64
+		UserID string
+	}
+
+	GetWorkspaceTemplateResponse struct {
+		Template WorkspaceTemplate
+	}
+
+	ListWorkspaceTemplatesRequest struct {
+		UserID string
+	}
+
+	ListWorkspaceTemplatesResponse struct {
+		Templates []WorkspaceTemplate
+	}
+
+	UpdateWorkspaceTemplateRequest struct {
+		Template WorkspaceTemplate
+		UserID   string
+	}
+
+	UpdateWorkspaceTemplateResponse struct {
+		Template WorkspaceTemplate
+	}
+
+	DeleteWorkspaceTemplateRequest struct {
+		ID     int64
+		UserID string
+	}
+
+	SaveWorkspaceAsTemplateRequest struct {
+		WorkspaceID int64
+		Name        string
+		Description string
+		UserID      string
+	}
+
+	SaveWorkspaceAsTemplateResponse struct {
+		Template WorkspaceTemplate
+	}
+
+	ApplyTemplateToWorkspaceRequest struct {
+		TemplateID   int64
+		WorkspaceID  int64
+		UserID       string
+	}
+
+	ApplyTemplateToWorkspaceResponse struct {
+		Workspace Workspace
+	}
+
+	// CustomField entities
+
+	CustomFieldDefinition struct {
+		ID          int64
+		CreatedAt   time.Time
+		UpdatedAt   time.Time
+		WorkspaceID int64
+		UserID      int64
+		Name        string
+		FieldType   string
+		Options     []string
+		SortOrder   float64
+	}
+
+	CreateCustomFieldRequest struct {
+		WorkspaceID int64
+		Field       CustomFieldDefinition
+		UserID      string
+	}
+
+	CreateCustomFieldResponse struct {
+		Field CustomFieldDefinition
+	}
+
+	ListCustomFieldsRequest struct {
+		WorkspaceID int64
+		UserID      string
+	}
+
+	ListCustomFieldsResponse struct {
+		Fields []CustomFieldDefinition
+	}
+
+	UpdateCustomFieldRequest struct {
+		WorkspaceID int64
+		Field       CustomFieldDefinition
+		UserID      string
+	}
+
+	UpdateCustomFieldResponse struct {
+		Field CustomFieldDefinition
+	}
+
+	DeleteCustomFieldRequest struct {
+		WorkspaceID int64
+		FieldID     int64
+		UserID      string
 	}
 )
 

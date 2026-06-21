@@ -34,11 +34,11 @@ export async function fetchUser() {
 }
 
 
-export async function createWorkspace(name, description, icon = '', selfLearningLoopNote = '') {
+export async function createWorkspace(name, description, icon = '', selfLearningLoopNote = '', templateId = '') {
   const res = await fetch(`${API_BASE_URL}/workspaces`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ workspace: { name, description, icon, selfLearningLoopNote } })
+    body: JSON.stringify({ workspace: { name, description, icon, selfLearningLoopNote, templateId } })
   });
   if (!res.ok) throw new Error('Failed to create workspace');
   return res.json();
@@ -86,21 +86,22 @@ export async function getTask(workspaceId, taskId) {
   return res.json();
 }
 
-export async function createTask(workspaceId, title, body, assignee = 'agent', attachments = [], status = 'notstarted', cronSchedule = '', allowAllCommands = false) {
+export async function createTask(workspaceId, title, body, assignee = 'agent', attachments = [], status = 'notstarted', cronSchedule = '', allowAllCommands = false, customFields = {}) {
   const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      task: { 
-        title, 
-        body, 
-        createdBy: 'human', 
-        assignee, 
-        attachments, 
-        status, 
+    body: JSON.stringify({
+      task: {
+        title,
+        body,
+        createdBy: 'human',
+        assignee,
+        attachments,
+        status,
         cronSchedule,
-        allowAllCommands: allowAllCommands
-      } 
+        allowAllCommands: allowAllCommands,
+        customFields
+      }
     })
   });
   if (!res.ok) throw new Error('Failed to create task');
@@ -216,7 +217,7 @@ export async function sendPermissionVerdict(workspaceId, taskId, requestId, beha
   if (!res.ok) throw new Error('Failed to send verdict');
   return res;
 }
-export async function updateScheduledTask(workspaceId, taskId, title, body, assignee, cronSchedule, allowAllCommands) {
+export async function updateScheduledTask(workspaceId, taskId, title, body, assignee, cronSchedule, allowAllCommands, customFields = {}) {
   const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/tasks/${taskId}/scheduled`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -226,7 +227,8 @@ export async function updateScheduledTask(workspaceId, taskId, title, body, assi
         body,
         assignee,
         cronSchedule,
-        allowAllCommands
+        allowAllCommands,
+        customFields
       }
     })
   });
@@ -273,4 +275,170 @@ export async function fetchGlobalTaskStats() {
   const res = await fetch(`${API_BASE_URL}/tasks/stats`);
   if (!res.ok) throw new Error('Failed to fetch global task stats');
   return res.json();
+}
+
+export async function fetchTemplates() {
+  const res = await fetch(`${API_BASE_URL}/templates`);
+  if (!res.ok) throw new Error('Failed to fetch templates');
+  return res.json();
+}
+
+export async function saveWorkspaceAsTemplate(workspaceId, name, description) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template: { name, description } })
+  });
+  if (!res.ok) throw new Error('Failed to save workspace as template');
+  return res.json();
+}
+
+export async function createTemplate(name, description, config) {
+  const res = await fetch(`${API_BASE_URL}/templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template: { name, description, config } })
+  });
+  if (!res.ok) throw new Error('Failed to create template');
+  return res.json();
+}
+
+export async function deleteTemplate(templateId) {
+  const res = await fetch(`${API_BASE_URL}/templates/${templateId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete template');
+  return true;
+}
+
+export async function applyTemplateToWorkspace(workspaceId, templateId) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/apply-template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ templateId })
+  });
+  if (!res.ok) throw new Error('Failed to apply template');
+  return res.json();
+}
+
+export async function fetchCustomFields(workspaceId) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/custom-fields`);
+  if (!res.ok) throw new Error('Failed to fetch custom fields');
+  return res.json();
+}
+
+export async function createCustomField(workspaceId, field) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/custom-fields`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customField: field })
+  });
+  if (!res.ok) throw new Error('Failed to create custom field');
+  return res.json();
+}
+
+export async function updateCustomField(workspaceId, fieldId, field) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/custom-fields/${fieldId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customField: field })
+  });
+  if (!res.ok) throw new Error('Failed to update custom field');
+  return res.json();
+}
+
+export async function deleteCustomField(workspaceId, fieldId) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/custom-fields/${fieldId}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('Failed to delete custom field');
+  return true;
+}
+
+export async function fetchTemplates() {
+  const res = await fetch(`${API_BASE_URL}/templates`);
+  if (!res.ok) throw new Error('Failed to fetch templates');
+  return res.json();
+}
+
+export async function getTemplate(id) {
+  const res = await fetch(`${API_BASE_URL}/templates/${id}`);
+  if (!res.ok) throw new Error('Failed to fetch template');
+  return res.json();
+}
+
+export async function createTemplate(template) {
+  const res = await fetch(`${API_BASE_URL}/templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template })
+  });
+  if (!res.ok) throw new Error('Failed to create template');
+  return res.json();
+}
+
+export async function updateTemplate(id, template) {
+  const res = await fetch(`${API_BASE_URL}/templates/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template })
+  });
+  if (!res.ok) throw new Error('Failed to update template');
+  return res.json();
+}
+
+export async function deleteTemplate(id) {
+  const res = await fetch(`${API_BASE_URL}/templates/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete template');
+  return true;
+}
+
+export async function saveWorkspaceAsTemplate(workspaceId, name, description = '') {
+  const res = await fetch(`${API_BASE_URL}/templates/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ workspaceId, name, description })
+  });
+  if (!res.ok) throw new Error('Failed to save workspace as template');
+  return res.json();
+}
+
+export async function applyTemplateToWorkspace(templateId, workspaceId) {
+  const res = await fetch(`${API_BASE_URL}/templates/apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ templateId, workspaceId })
+  });
+  if (!res.ok) throw new Error('Failed to apply template to workspace');
+  return res.json();
+}
+
+export async function fetchCustomFields(workspaceId) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/custom-fields`);
+  if (!res.ok) throw new Error('Failed to fetch custom fields');
+  return res.json();
+}
+
+export async function createCustomField(workspaceId, field) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/custom-fields`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ field })
+  });
+  if (!res.ok) throw new Error('Failed to create custom field');
+  return res.json();
+}
+
+export async function updateCustomField(workspaceId, fieldId, field) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/custom-fields/${fieldId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ field })
+  });
+  if (!res.ok) throw new Error('Failed to update custom field');
+  return res.json();
+}
+
+export async function deleteCustomField(workspaceId, fieldId) {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/custom-fields/${fieldId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete custom field');
+  return true;
 }

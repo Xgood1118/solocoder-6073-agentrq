@@ -95,6 +95,15 @@
                                  'text-gray-700 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white font-semibold' ]">
                     {{ task.title }}
                   </h3>
+
+                  <!-- Custom Fields Display -->
+                  <div v-if="getTaskCustomFields(task).length > 0" class="mt-2 flex flex-wrap gap-1.5">
+                    <span v-for="cf in getTaskCustomFields(task)" :key="cf.def.id"
+                          class="inline-flex items-center gap-1 text-[9px] font-medium text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">
+                      <span class="font-semibold text-gray-400">{{ cf.def.name }}:</span>
+                      {{ cf.display }}
+                    </span>
+                  </div>
                   
                   <!-- Quick actions for Pending -->
                   <div v-if="filterType === 'pending'" class="mt-3" @click.stop>
@@ -155,7 +164,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { fetchGlobalTasks, fetchWorkspaces, sendPermissionVerdict, updateTaskAssignee, updateTaskStatus, updateTaskOrder } from '../api';
+import { fetchGlobalTasks, fetchWorkspaces, sendPermissionVerdict, updateTaskAssignee, updateTaskStatus, updateTaskOrder, fetchCustomFields } from '../api';
 import { useToasts } from '../composables/useToasts';
 import { useTooltipStore } from '../stores/tooltipStore';
 import { useCron } from '../composables/useCron';
@@ -176,6 +185,34 @@ const limit = 10;
 const hasMore = ref(true);
 const tooltipStore = useTooltipStore();
 const showMobileFilters = ref(false);
+const customFieldDefs = ref({});
+
+function formatCustomFieldValue(fieldDef, value) {
+  if (value === null || value === undefined || value === '') return '';
+  if (fieldDef.fieldType === 'multiselect' && Array.isArray(value)) {
+    return value.join(', ');
+  }
+  if (fieldDef.fieldType === 'date' && typeof value === 'string') {
+    try {
+      const d = new Date(value + 'T00:00:00');
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch { return value; }
+  }
+  return String(value);
+}
+
+function getTaskCustomFields(task) {
+  if (!task.customFields || typeof task.customFields !== 'object') return [];
+  const defs = customFieldDefs.value[task.workspaceId] || [];
+  const result = [];
+  for (const def of defs) {
+    const val = task.customFields[def.name];
+    if (val !== null && val !== undefined && val !== '' && !(Array.isArray(val) && val.length === 0)) {
+      result.push({ def, value: val, display: formatCustomFieldValue(def, val) });
+    }
+  }
+  return result;
+}
 
 // Setup Global Event Bus
 const { connect, disconnect, events } = useEventBus();
@@ -374,6 +411,14 @@ const fetchInitial = async () => {
   try {
     const wsRes = await fetchWorkspaces();
     workspaces.value = wsRes.workspaces;
+
+    const cfPromises = wsRes.workspaces.map(async (ws) => {
+      try {
+        const cfRes = await fetchCustomFields(ws.id);
+        customFieldDefs.value[ws.id] = (cfRes.fields || []).sort((a, b) => a.sortOrder - b.sortOrder);
+      } catch { customFieldDefs.value[ws.id] = []; }
+    });
+    await Promise.all(cfPromises);
     
     await fetchNext();
   } catch (err) {

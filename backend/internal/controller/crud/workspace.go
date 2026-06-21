@@ -29,6 +29,7 @@ func (c *controller) CreateWorkspace(ctx context.Context, req entity.CreateWorks
 		Description:          req.Workspace.Description,
 		AllowAllCommands:     req.Workspace.AllowAllCommands,
 		SelfLearningLoopNote: req.Workspace.SelfLearningLoopNote,
+		TemplateID:           req.Workspace.TemplateID,
 	}
 
 	// Generate and encrypt token for new workspace
@@ -56,6 +57,31 @@ func (c *controller) CreateWorkspace(ctx context.Context, req entity.CreateWorks
 	if err != nil {
 		return nil, fmt.Errorf("create workspace: %w", err)
 	}
+
+	if req.Workspace.TemplateID != 0 {
+		tmpl, err := c.repository.GetWorkspaceTemplate(ctx, req.Workspace.TemplateID, userID)
+		if err == nil {
+			if len(tmpl.AutoAllowedTools) > 0 {
+				created.AutoAllowedTools = tmpl.AutoAllowedTools
+			}
+			if tmpl.AllowAllCommands {
+				created.AllowAllCommands = true
+			}
+			if len(tmpl.NotificationSettings) > 0 {
+				created.NotificationSettings = tmpl.NotificationSettings
+			}
+			if tmpl.SelfLearningLoopNote != "" {
+				created.SelfLearningLoopNote = tmpl.SelfLearningLoopNote
+			}
+			created.TemplateID = tmpl.ID
+			created.UpdatedAt = time.Now()
+			created, err = c.repository.UpdateWorkspace(ctx, created)
+			if err != nil {
+				return nil, fmt.Errorf("apply template to workspace: %w", err)
+			}
+		}
+	}
+
 	c.emitEvent(ctx, entity.CRUDEvent{
 		Action:       entity.ActionWorkspaceCreate,
 		WorkspaceID:  created.ID,
@@ -307,6 +333,7 @@ func fromModelWorkspaceToEntity(m model.Workspace) entity.Workspace {
 		AutoAllowedTools:     make([]string, 0),
 		AllowAllCommands:     m.AllowAllCommands,
 		SelfLearningLoopNote: m.SelfLearningLoopNote,
+		TemplateID:           m.TemplateID,
 	}
 	if len(m.AutoAllowedTools) > 0 {
 		_ = json.Unmarshal(m.AutoAllowedTools, &res.AutoAllowedTools)

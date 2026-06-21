@@ -40,6 +40,13 @@
                 </label>
                 <textarea v-model="form.selfLearningLoopNote" rows="4" class="w-full bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-700 rounded-sm px-4 py-3 text-sm outline-none font-medium text-gray-800 dark:text-zinc-200 transition-all resize-none focus:border-gray-900 dark:focus:border-white focus:ring-0 shadow-sm" placeholder="Upon completing the task, evaluate your execution path..."></textarea>
               </div>
+              <div class="space-y-2">
+                <label class="block text-[10px] font-black text-gray-500 dark:text-zinc-400">Template</label>
+                <select v-model="form.templateId" class="w-full bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-700 rounded-sm px-4 py-3 text-sm outline-none font-medium text-gray-800 dark:text-zinc-200 focus:border-gray-900 dark:focus:border-white focus:ring-0 transition-all shadow-sm appearance-none cursor-pointer">
+                  <option value="">No template (blank workspace)</option>
+                  <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </select>
+              </div>
               <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-zinc-800">
                 <button type="button" @click="showCreate = false" class="px-6 py-2.5 rounded-sm border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 text-[10px] font-black hover:bg-gray-50 dark:hover:bg-zinc-700 transition-all shadow-sm">Cancel</button>
                 <button type="submit" class="bg-gray-900 dark:bg-zinc-100 text-white dark:text-gray-900 px-6 py-2.5 rounded-sm border border-transparent text-[10px] font-black hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-all shadow-md flex items-center gap-2" :disabled="loading">
@@ -214,7 +221,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { fetchWorkspaces, createWorkspace, unarchiveWorkspace, fetchGlobalTasks, fetchGlobalTaskStats } from '../api';
+import { fetchWorkspaces, createWorkspace, unarchiveWorkspace, fetchGlobalTasks, fetchGlobalTaskStats, fetchTemplates } from '../api';
 import { useToasts } from '../composables/useToasts';
 import { useEventBus } from '../useEventBus';
 import { useWorkspaceStore } from '../stores/workspaceStore';
@@ -235,7 +242,8 @@ const iconError = ref('');
 const createFileInput = ref(null);
 const error = ref(null);
 
-const form = ref({ name: '', description: '', icon: '', selfLearningLoopNote: '' });
+const form = ref({ name: '', description: '', icon: '', selfLearningLoopNote: '', templateId: '' });
+const templates = ref([]);
 const globalStats = ref({
   totalTasks: 0,
   pendingTasks: 0,
@@ -290,6 +298,15 @@ async function loadWorkspaces() {
   }
 }
 
+async function loadTemplates() {
+  try {
+    const res = await fetchTemplates();
+    templates.value = res.templates || [];
+  } catch (err) {
+    // silently ignore — template selection is optional
+  }
+}
+
 watch(() => form.value.name, (newVal) => {
   if (newVal) {
     const formatted = liveKebabCase(newVal);
@@ -301,7 +318,7 @@ watch(() => form.value.name, (newVal) => {
 
 watch(showCreate, (val) => {
   if (!val) {
-    form.value = { name: '', description: '', icon: '', selfLearningLoopNote: '' };
+    form.value = { name: '', description: '', icon: '', selfLearningLoopNote: '', templateId: '' };
     iconError.value = '';
   }
 });
@@ -336,11 +353,11 @@ async function submit() {
   loading.value = true;
   error.value = null;
   try {
-    const res = await createWorkspace(form.value.name, form.value.description, form.value.icon, form.value.selfLearningLoopNote);
+    const res = await createWorkspace(form.value.name, form.value.description, form.value.icon, form.value.selfLearningLoopNote, form.value.templateId);
     const newId = res.workspace?.id || res.id;
     
     showCreate.value = false;
-    form.value = { name: '', description: '', icon: '', selfLearningLoopNote: '' };
+    form.value = { name: '', description: '', icon: '', selfLearningLoopNote: '', templateId: '' };
     iconError.value = ''; 
     
     if (newId) {
@@ -396,6 +413,7 @@ watch(events, (newEvents) => {
 
 onMounted(async () => {
   await loadWorkspaces();
+  loadTemplates();
   connect();
 });
 

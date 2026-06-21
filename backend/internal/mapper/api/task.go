@@ -33,18 +33,24 @@ func FromHTTPRequestToCreateTaskRequestEntity(c *fiber.Ctx) *entity.CreateTaskRe
 		}
 	}
 
+	var customFields map[string]any
+	if cf, ok := payload.Task.CustomFields.(map[string]any); ok {
+		customFields = cf
+	}
+
 	return &entity.CreateTaskRequest{
 		Task: entity.Task{
-			WorkspaceID:  workspaceID,
-			CreatedBy:    payload.Task.CreatedBy,
-			Assignee:     payload.Task.Assignee,
-			Title:        payload.Task.Title,
-			Body:         payload.Task.Body,
-			Status:       payload.Task.Status,
-			Attachments:  entityAttachments,
-			CronSchedule: payload.Task.CronSchedule,
-			SortOrder:    payload.Task.SortOrder,
+			WorkspaceID:      workspaceID,
+			CreatedBy:        payload.Task.CreatedBy,
+			Assignee:         payload.Task.Assignee,
+			Title:            payload.Task.Title,
+			Body:             payload.Task.Body,
+			Status:           payload.Task.Status,
+			Attachments:      entityAttachments,
+			CronSchedule:     payload.Task.CronSchedule,
+			SortOrder:        payload.Task.SortOrder,
 			AllowAllCommands: payload.Task.AllowAllCommands,
+			CustomFields:     customFields,
 		},
 	}
 }
@@ -296,6 +302,7 @@ func FromEntityTaskToView(t entity.Task) view.Task {
 		CronSchedule: t.CronSchedule,
 		SortOrder:    t.SortOrder,
 		AllowAllCommands: t.AllowAllCommands,
+		CustomFields:     t.CustomFields,
 	}
 	if t.ParentID != 0 {
 		res.ParentID = monoflake.ID(t.ParentID).String()
@@ -382,6 +389,12 @@ func FromModelTaskToView(t model.Task) view.Task {
 		CronSchedule: t.CronSchedule,
 		SortOrder:    t.SortOrder,
 		AllowAllCommands: t.AllowAllCommands,
+	}
+	if len(t.CustomFields) > 0 {
+		var cf map[string]any
+		if err := json.Unmarshal(t.CustomFields, &cf); err == nil {
+			res.CustomFields = cf
+		}
 	}
 	if t.ParentID != 0 {
 		res.ParentID = monoflake.ID(t.ParentID).String()

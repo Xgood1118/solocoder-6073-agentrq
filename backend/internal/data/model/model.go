@@ -23,6 +23,7 @@ type (
 		AutoAllowedTools     datatypes.JSON `gorm:"type:text"`
 		AllowAllCommands     bool           `gorm:"default:false"`
 		SelfLearningLoopNote string         `gorm:"type:text"`
+		TemplateID           int64          `gorm:"default:0"`
 	}
 
 	// Task hosts a task created by a human or an agent within a workspace
@@ -47,6 +48,7 @@ type (
 		ParentID         int64   `gorm:"index:idx_tasks_parent_id"`
 		SortOrder        float64 `gorm:"type:real;default:0"`
 		AllowAllCommands bool    `gorm:"default:false"`
+		CustomFields     datatypes.JSON `gorm:"type:text"`
 	}
 
 	// Message is an entry in a task's chat history
@@ -114,6 +116,33 @@ type (
 		WorkspaceID    int64  `gorm:"index"`
 		SlackChannelID string `gorm:"type:varchar(32)"`
 		ThreadTS       string `gorm:"type:varchar(32)"` // Slack message ts that anchors the thread
+	}
+
+	WorkspaceTemplate struct {
+		ID                 int64          `gorm:"primaryKey;autoIncrement:false"`
+		CreatedAt          time.Time
+		UpdatedAt          time.Time
+		UserID             int64          `gorm:"index:idx_workspace_templates_user_id"`
+		Name               string         `gorm:"type:varchar(128)"`
+		Description        string         `gorm:"type:text"`
+		ColumnConfig       datatypes.JSON `gorm:"type:text"`
+		FilterConfig       datatypes.JSON `gorm:"type:text"`
+		AutoAllowedTools   datatypes.JSON `gorm:"type:text"`
+		AllowAllCommands   bool           `gorm:"default:false"`
+		NotificationSettings datatypes.JSON `gorm:"type:text"`
+		SelfLearningLoopNote string       `gorm:"type:text"`
+	}
+
+	CustomField struct {
+		ID          int64          `gorm:"primaryKey;autoIncrement:false"`
+		CreatedAt   time.Time
+		UpdatedAt   time.Time
+		WorkspaceID int64          `gorm:"index:idx_custom_fields_workspace_id"`
+		UserID      int64          `gorm:"index:idx_custom_fields_user_id"`
+		Name        string         `gorm:"type:varchar(128)"`
+		FieldType   string         `gorm:"type:varchar(32)"`
+		Options     datatypes.JSON `gorm:"type:text"`
+		SortOrder   float64        `gorm:"type:real;default:0"`
 	}
 )
 

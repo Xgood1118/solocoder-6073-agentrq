@@ -48,6 +48,20 @@ type GetNextTaskFunc func(ctx context.Context) (model.Task, error)
 type ReplyFunc func(ctx context.Context, chatID string, text string, attachments []entity.Attachment, metadata any) (int64, error)
 type UpdateMessageMetadataFunc func(ctx context.Context, taskID int64, messageID int64, metadata any) error
 type UpdateWorkspaceAutoAllowedToolsFunc func(ctx context.Context, tools []string) error
+type DeleteTaskFunc func(ctx context.Context, workspaceID, taskID, userID int64) error
+
+type BatchOperationItem struct {
+	Operation string `json:"operation" jsonschema:"Operation type: 'create', 'update', or 'delete'"`
+	TaskID    string `json:"taskId,omitempty" jsonschema:"Task ID (required for update/delete)"`
+	Title     string `json:"title,omitempty" jsonschema:"Task title (required for create)"`
+	Body      string `json:"body,omitempty" jsonschema:"Task body (optional for create)"`
+	Assignee  string `json:"assignee,omitempty" jsonschema:"Task assignee: 'human' or 'agent' (optional for create)"`
+	Status    string `json:"status,omitempty" jsonschema:"Task status (required for update)"`
+}
+
+type BatchOperationsParams struct {
+	Operations []BatchOperationItem `json:"operations" jsonschema:"List of batch operations to execute"`
+}
 
 type PermissionRequestParams struct {
 	RequestID    string `json:"request_id"`
@@ -71,6 +85,7 @@ type WorkspaceServer struct {
 	reply                 ReplyFunc
 	updateMessageMetadata UpdateMessageMetadataFunc
 	updateAutoAllowed     UpdateWorkspaceAutoAllowedToolsFunc
+	deleteTask            DeleteTaskFunc
 	bus                   *eventbus.Bus
 	idgen                 idgen.Service
 	storage               storage.Service
@@ -147,6 +162,7 @@ func NewWorkspaceServer(
 	reply ReplyFunc,
 	updateMessageMetadata UpdateMessageMetadataFunc,
 	updateAutoAllowed UpdateWorkspaceAutoAllowedToolsFunc,
+	deleteTask DeleteTaskFunc,
 	bus *eventbus.Bus,
 	ids idgen.Service,
 	store storage.Service,
@@ -170,6 +186,7 @@ func NewWorkspaceServer(
 		reply:                 reply,
 		updateMessageMetadata: updateMessageMetadata,
 		updateAutoAllowed:     updateAutoAllowed,
+		deleteTask:            deleteTask,
 		bus:                   bus,
 		idgen:                 ids,
 		storage:               store,
@@ -271,6 +288,11 @@ func NewWorkspaceServer(
 		Name:        "getNextTask",
 		Description: "Get the next available \"not started\" task assigned to the agent.",
 	}, ps.handleGetNextTask)
+
+	mcp.AddTool(mcpSrv, &mcp.Tool{
+		Name:        "batchOperations",
+		Description: "Batch create, update, or delete multiple tasks in a single call. Returns per-item status and error details.",
+	}, ps.handleBatchOperations)
 
 	// Add middleware to handle incoming notifications (like permission_request)
 	mcpSrv.AddReceivingMiddleware(ps.notificationMiddleware)
@@ -959,6 +981,154 @@ func (ps *WorkspaceServer) handleGetNextTask(ctx context.Context, req *mcp.CallT
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: content}},
+	}, nil, nil
+}
+
+func (ps *WorkspaceServer) handleBatchOperations(ctx context.Context, req *mcp.CallToolRequest, params BatchOperationsParams) (*mcp.CallToolResult, any, error) {
+	ps.emitTelemetry(ctx, ActionMCPToolCall, "batchOperations")
+	ps.metadataMu.RLock()
+	isArchived := ps.archivedAt != nil
+	ps.metadataMu.RUnlock()
+
+	if isArchived {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "workspace is archived and read-only"}},
+		}, nil, nil
+	}
+
+	if len(params.Operations) == 0 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "at least one operation is required"}},
+		}, nil, nil
+	}
+
+	if len(params.Operations) > 50 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "maximum 50 operations per batch"}},
+		}, nil, nil
+	}
+
+	results := make([]map[string]any, 0, len(params.Operations))
+
+	for i, op := range params.Operations {
+		result := map[string]any{
+			"index":    i,
+			"operation": op.Operation,
+		}
+
+		switch op.Operation {
+		case "create":
+			if op.Title == "" {
+				result["status"] = "error"
+				result["error"] = "title is required for create"
+				results = append(results, result)
+				continue
+			}
+			assignee := op.Assignee
+			if assignee == "" {
+				assignee = "agent"
+			}
+			status := "notstarted"
+			t := model.Task{
+				ID:          ps.idgen.NextID(),
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+				WorkspaceID: ps.workspaceID,
+				UserID:      monoflake.IDFromBase62(ps.userID).Int64(),
+				CreatedBy:   "agent",
+				Assignee:    assignee,
+				Status:      status,
+				Title:       op.Title,
+				Body:        op.Body,
+			}
+			created, err := ps.createTask(ctx, t)
+			if err != nil {
+				result["status"] = "error"
+				result["error"] = err.Error()
+			} else {
+				result["status"] = "success"
+				result["taskId"] = monoflake.ID(created.ID).String()
+				ps.bus.Publish(ps.workspaceID, ps.userID, eventbus.Event{
+					Type:    "task.created",
+					Payload: mapper.FromModelTaskToView(created),
+				})
+			}
+
+		case "update":
+			if op.TaskID == "" {
+				result["status"] = "error"
+				result["error"] = "taskId is required for update"
+				results = append(results, result)
+				continue
+			}
+			if op.Status == "" {
+				result["status"] = "error"
+				result["error"] = "status is required for update"
+				results = append(results, result)
+				continue
+			}
+			id := monoflake.IDFromBase62(op.TaskID)
+			if id == 0 {
+				result["status"] = "error"
+				result["error"] = "invalid taskId format"
+				results = append(results, result)
+				continue
+			}
+			updated, err := ps.updateStatus(ctx, id.Int64(), op.Status)
+			if err != nil {
+				result["status"] = "error"
+				result["error"] = err.Error()
+			} else {
+				result["status"] = "success"
+				result["taskId"] = monoflake.ID(updated.ID).String()
+				ps.bus.Publish(ps.workspaceID, ps.userID, eventbus.Event{
+					Type:    "task.updated",
+					Payload: mapper.FromModelTaskToView(updated),
+				})
+			}
+
+		case "delete":
+			if op.TaskID == "" {
+				result["status"] = "error"
+				result["error"] = "taskId is required for delete"
+				results = append(results, result)
+				continue
+			}
+			id := monoflake.IDFromBase62(op.TaskID)
+			if id == 0 {
+				result["status"] = "error"
+				result["error"] = "invalid taskId format"
+				results = append(results, result)
+				continue
+			}
+			uid := monoflake.IDFromBase62(ps.userID).Int64()
+			err := ps.deleteTask(ctx, ps.workspaceID, id.Int64(), uid)
+			if err != nil {
+				result["status"] = "error"
+				result["error"] = err.Error()
+			} else {
+				result["status"] = "success"
+				result["taskId"] = op.TaskID
+			}
+
+		default:
+			result["status"] = "error"
+			result["error"] = fmt.Sprintf("unknown operation: %s", op.Operation)
+		}
+
+		results = append(results, result)
+	}
+
+	b, _ := json.Marshal(map[string]any{
+		"results": results,
+		"total":   len(results),
+	})
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(b)}},
 	}, nil, nil
 }
 

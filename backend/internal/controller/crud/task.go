@@ -107,6 +107,13 @@ func (c *controller) CreateTask(ctx context.Context, req entity.CreateTaskReques
 		SortOrder:    sortOrder,
 		AllowAllCommands: allowAll,
 	}
+
+	if len(req.Task.CustomFields) > 0 {
+		if b, err := json.Marshal(req.Task.CustomFields); err == nil {
+			m.CustomFields = datatypes.JSON(b)
+		}
+	}
+
 	created, err := c.repository.CreateTask(ctx, m)
 	if err != nil {
 		return nil, fmt.Errorf("create task: %w", err)
@@ -600,6 +607,11 @@ func (c *controller) fromModelTaskToEntity(m model.Task) entity.Task {
 		_ = json.Unmarshal(m.Attachments, &atts)
 	}
 
+	var cf map[string]any
+	if len(m.CustomFields) > 0 {
+		_ = json.Unmarshal(m.CustomFields, &cf)
+	}
+
 	msgs := make([]entity.Message, len(m.Messages))
 	for i, msg := range m.Messages {
 		var msgAtts []entity.Attachment
@@ -641,6 +653,7 @@ func (c *controller) fromModelTaskToEntity(m model.Task) entity.Task {
 		ParentID:     m.ParentID,
 		SortOrder:    m.SortOrder,
 		AllowAllCommands: m.AllowAllCommands,
+		CustomFields:     cf,
 	}
 }
 

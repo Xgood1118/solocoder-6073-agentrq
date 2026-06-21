@@ -78,6 +78,50 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- Custom Fields -->
+                <div v-if="customFieldDefinitions.length > 0" class="pt-4 border-t border-gray-100 dark:border-zinc-800/50">
+                  <span class="text-[10px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-widest mb-3 block">Custom Fields</span>
+                  <div class="space-y-4">
+                    <div v-for="field in customFieldDefinitions" :key="field.id" class="flex flex-col gap-2">
+                      <label class="text-[10px] font-semibold text-gray-500 dark:text-zinc-400">{{ field.name }}</label>
+
+                      <input v-if="field.fieldType === 'text'"
+                             v-model="customFields[field.name]"
+                             :placeholder="field.name + '...'"
+                             :class="inputClass" />
+
+                      <input v-else-if="field.fieldType === 'number'"
+                             v-model.number="customFields[field.name]"
+                             type="number"
+                             :placeholder="field.name + '...'"
+                             :class="inputClass" />
+
+                      <select v-else-if="field.fieldType === 'select'"
+                              v-model="customFields[field.name]"
+                              :class="inputClass">
+                        <option value="" disabled selected>Select...</option>
+                        <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+                      </select>
+
+                      <div v-else-if="field.fieldType === 'multiselect'" class="flex flex-wrap gap-2">
+                        <label v-for="opt in field.options" :key="opt"
+                               class="flex items-center gap-1.5 bg-white border border-gray-200 rounded-sm px-3 py-2 cursor-pointer hover:border-gray-400 transition-all text-[11px] font-medium text-gray-700">
+                          <input type="checkbox"
+                                 :checked="(customFields[field.name] || []).includes(opt)"
+                                 @change="toggleMultiSelectOption(field.name, opt)"
+                                 class="w-3.5 h-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-900" />
+                          {{ opt }}
+                        </label>
+                      </div>
+
+                      <input v-else-if="field.fieldType === 'date'"
+                             v-model="customFields[field.name]"
+                             type="date"
+                             :class="inputClass" />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -231,7 +275,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import cronParser from 'cron-parser';
-import { getWorkspace, createTask, updateScheduledTask, getTask } from '../api';
+import { getWorkspace, createTask, updateScheduledTask, getTask, fetchCustomFields } from '../api';
 import { useToasts } from '../composables/useToasts';
 import { useCron } from '../composables/useCron';
 
@@ -251,6 +295,19 @@ const fileInput = ref(null);
 
 const newTask = ref({ title: '', body: '', assignee: 'agent', cronSchedule: '', allowAllCommands: false });
 const newTaskAttachments = ref([]);
+const customFieldDefinitions = ref([]);
+const customFields = ref({});
+
+const inputClass = 'w-full bg-white border border-gray-200 rounded-sm px-4 py-3 text-sm outline-none font-medium text-gray-900 focus:border-gray-900 focus:ring-0 transition-all placeholder:text-gray-400 shadow-sm';
+
+function toggleMultiSelectOption(fieldName, option) {
+  const current = customFields.value[fieldName] || [];
+  if (current.includes(option)) {
+    customFields.value[fieldName] = current.filter(o => o !== option);
+  } else {
+    customFields.value[fieldName] = [...current, option];
+  }
+}
 
 // Scheduling state
 const scheduleType = ref('none');
@@ -273,22 +330,28 @@ onMounted(async () => {
     const res = await getWorkspace(workspaceId);
     workspace.value = res.workspace;
 
+    const cfRes = await fetchCustomFields(workspaceId);
+    customFieldDefinitions.value = (cfRes.fields || []).sort((a, b) => a.sortOrder - b.sortOrder);
+
     if (isEditMode.value) {
       const taskRes = await getTask(workspaceId, taskId);
       const t = taskRes.task;
-      newTask.value = { 
-        title: t.title, 
-        body: t.body, 
-        assignee: t.assignee, 
+      newTask.value = {
+        title: t.title,
+        body: t.body,
+        assignee: t.assignee,
         cronSchedule: t.cronSchedule,
         allowAllCommands: t.allowAllCommands || false
       };
-      
+
+      if (t.customFields && typeof t.customFields === 'object') {
+        customFields.value = { ...t.customFields };
+      }
+
       if (t.cronSchedule) {
         parseCronToUI(t.cronSchedule);
       }
     } else {
-      // Default to workspace setting for new tasks
       newTask.value.allowAllCommands = res.workspace.allowAllCommands || false;
     }
   } catch (err) {
@@ -448,10 +511,12 @@ async function submitHumanTask() {
   sending.value = true;
   try {
     const status = scheduleType.value !== 'none' ? 'cron' : 'notstarted';
+    const cfPayload = Object.keys(customFields.value).length > 0 ? customFields.value : undefined;
     await createTask(
-      workspaceId, newTask.value.title, newTask.value.body, 
+      workspaceId, newTask.value.title, newTask.value.body,
       newTask.value.assignee, newTaskAttachments.value,
-      status, newTask.value.cronSchedule, newTask.value.allowAllCommands
+      status, newTask.value.cronSchedule, newTask.value.allowAllCommands,
+      cfPayload
     );
     notifySuccess('Task Created successfully');
     goBack(status === 'cron');
@@ -463,10 +528,11 @@ async function submitHumanTask() {
 async function submitEditProtocol() {
   sending.value = true;
   try {
+    const cfPayload = Object.keys(customFields.value).length > 0 ? customFields.value : undefined;
     await updateScheduledTask(
       workspaceId, taskId, newTask.value.title, newTask.value.body,
       newTask.value.assignee, newTask.value.cronSchedule,
-      newTask.value.allowAllCommands
+      newTask.value.allowAllCommands, cfPayload
     );
     notifySuccess('Scheduled Task Updated');
     goBack(newTask.value.cronSchedule !== '');

@@ -27,6 +27,8 @@ type (
 		WorkspaceController
 		UserController
 		TaskController
+		TemplateController
+		CustomFieldController
 	}
 
 	controller struct {
@@ -108,4 +110,21 @@ type TaskController interface {
 	DeleteTask(ctx context.Context, req entity.DeleteTaskRequest) (*entity.DeleteTaskResponse, error)
 	GetAttachment(ctx context.Context, req entity.GetAttachmentRequest) (*entity.GetAttachmentResponse, error)
 	GetWorkspaceTaskCounts(ctx context.Context, req entity.GetWorkspaceTaskCountsRequest) (map[string]int64, error)
+}
+
+type TemplateController interface {
+	CreateWorkspaceTemplate(ctx context.Context, req entity.CreateWorkspaceTemplateRequest) (*entity.CreateWorkspaceTemplateResponse, error)
+	GetWorkspaceTemplate(ctx context.Context, req entity.GetWorkspaceTemplateRequest) (*entity.GetWorkspaceTemplateResponse, error)
+	ListWorkspaceTemplates(ctx context.Context, req entity.ListWorkspaceTemplatesRequest) (*entity.ListWorkspaceTemplatesResponse, error)
+	UpdateWorkspaceTemplate(ctx context.Context, req entity.UpdateWorkspaceTemplateRequest) (*entity.UpdateWorkspaceTemplateResponse, error)
+	DeleteWorkspaceTemplate(ctx context.Context, req entity.DeleteWorkspaceTemplateRequest) error
+	SaveWorkspaceAsTemplate(ctx context.Context, req entity.SaveWorkspaceAsTemplateRequest) (*entity.SaveWorkspaceAsTemplateResponse, error)
+	ApplyTemplateToWorkspace(ctx context.Context, req entity.ApplyTemplateToWorkspaceRequest) (*entity.ApplyTemplateToWorkspaceResponse, error)
+}
+
+type CustomFieldController interface {
+	CreateCustomField(ctx context.Context, req entity.CreateCustomFieldRequest) (*entity.CreateCustomFieldResponse, error)
+	GetCustomFields(ctx context.Context, req entity.ListCustomFieldsRequest) (*entity.ListCustomFieldsResponse, error)
+	UpdateCustomField(ctx context.Context, req entity.UpdateCustomFieldRequest) (*entity.UpdateCustomFieldResponse, error)
+	DeleteCustomField(ctx context.Context, req entity.DeleteCustomFieldRequest) error
 }

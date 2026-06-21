@@ -21,6 +21,7 @@ type (
 		AllowAllCommands     bool                  `json:"allowAllCommands"`
 		SelfLearningLoopNote string                `json:"selfLearningLoopNote,omitempty"`
 		Slack                *SlackConfig          `json:"slack,omitempty"`
+		TemplateID           string                `json:"templateId,omitempty"`
 	}
 
 	SlackConfig struct {
@@ -104,6 +105,7 @@ type (
 		ParentID         string       `json:"parentId,omitempty"`
 		SortOrder        float64      `json:"sortOrder"`
 		AllowAllCommands bool         `json:"allowAllCommands"`
+		CustomFields     any          `json:"customFields,omitempty"`
 	}
 
 	CreateTaskRequest struct {
@@ -234,5 +236,97 @@ type (
 
 	PushSubscriptionStatusResponse struct {
 		Subscribed bool `json:"subscribed"`
+	}
+
+	// WorkspaceTemplate views
+
+	WorkspaceTemplate struct {
+		ID                   string                `json:"id"`
+		CreatedAt            time.Time             `json:"createdAt"`
+		UpdatedAt            time.Time             `json:"updatedAt"`
+		Name                 string                `json:"name"`
+		Description          string                `json:"description,omitempty"`
+		ColumnConfig         []string              `json:"columnConfig,omitempty"`
+		FilterConfig         any                   `json:"filterConfig,omitempty"`
+		AutoAllowedTools     []string              `json:"autoAllowedTools,omitempty"`
+		AllowAllCommands     bool                  `json:"allowAllCommands"`
+		NotificationSettings *NotificationSettings `json:"notificationSettings,omitempty"`
+		SelfLearningLoopNote string                `json:"selfLearningLoopNote,omitempty"`
+	}
+
+	CreateWorkspaceTemplateRequest struct {
+		Template WorkspaceTemplate `json:"template"`
+	}
+
+	CreateWorkspaceTemplateResponse struct {
+		Template WorkspaceTemplate `json:"template"`
+	}
+
+	GetWorkspaceTemplateResponse struct {
+		Template WorkspaceTemplate `json:"template"`
+	}
+
+	ListWorkspaceTemplatesResponse struct {
+		Templates []WorkspaceTemplate `json:"templates"`
+	}
+
+	UpdateWorkspaceTemplateRequest struct {
+		Template WorkspaceTemplate `json:"template"`
+	}
+
+	UpdateWorkspaceTemplateResponse struct {
+		Template WorkspaceTemplate `json:"template"`
+	}
+
+	SaveWorkspaceAsTemplateRequest struct {
+		WorkspaceID string `json:"workspaceId"`
+		Name        string `json:"name"`
+		Description string `json:"description,omitempty"`
+	}
+
+	SaveWorkspaceAsTemplateResponse struct {
+		Template WorkspaceTemplate `json:"template"`
+	}
+
+	ApplyTemplateToWorkspaceRequest struct {
+		TemplateID  string `json:"templateId"`
+		WorkspaceID string `json:"workspaceId"`
+	}
+
+	ApplyTemplateToWorkspaceResponse struct {
+		Workspace Workspace `json:"workspace"`
+	}
+
+	// CustomField views
+
+	CustomFieldDefinition struct {
+		ID          string   `json:"id"`
+		CreatedAt   time.Time `json:"createdAt"`
+		UpdatedAt   time.Time `json:"updatedAt"`
+		WorkspaceID string   `json:"workspaceId"`
+		Name        string   `json:"name"`
+		FieldType   string   `json:"fieldType"`
+		Options     []string `json:"options,omitempty"`
+		SortOrder   float64  `json:"sortOrder"`
+	}
+
+	CreateCustomFieldRequest struct {
+		Field CustomFieldDefinition `json:"field"`
+	}
+
+	CreateCustomFieldResponse struct {
+		Field CustomFieldDefinition `json:"field"`
+	}
+
+	ListCustomFieldsResponse struct {
+		Fields []CustomFieldDefinition `json:"fields"`
+	}
+
+	UpdateCustomFieldRequest struct {
+		Field CustomFieldDefinition `json:"field"`
+	}
+
+	UpdateCustomFieldResponse struct {
+		Field CustomFieldDefinition `json:"field"`
 	}
 )

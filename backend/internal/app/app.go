@@ -153,6 +153,8 @@ func New(cfg Config) (*App, error) {
 		&model.SlackWorkspaceLink{},
 		&model.SlackTaskThread{},
 		&model.PushSubscription{},
+		&model.WorkspaceTemplate{},
+		&model.CustomField{},
 	); err != nil {
 		return nil, fmt.Errorf("migrate db: %w", err)
 	}
@@ -497,6 +499,28 @@ func New(cfg Config) (*App, error) {
 					Tools:       tools,
 					UserID:      monoflake.ID(workspace.UserID).String(),
 				})
+			},
+			func(ctx context.Context, workspaceID, taskID, userID int64) error {
+				err := repo.DeleteTask(ctx, workspaceID, taskID, userID)
+				if err == nil {
+					pubsubSvc.Publish(context.Background(), pubsub.PublishRequest{
+						PubSubID: entity.PubSubTopicCRUD,
+						Event: entity.CRUDEvent{
+							Action:       entity.ActionTaskDelete,
+							WorkspaceID:  workspaceID,
+							UserID:       userID,
+							ResourceType: entity.ResourceTask,
+							ResourceID:   taskID,
+							Actor:        entity.ActorAgent,
+							Origin:       entity.OriginMCP,
+						},
+					})
+					bus.Publish(workspaceID, workspaceOwner, eventbus.Event{
+						Type:    "task.deleted",
+						Payload: map[string]any{"taskId": monoflake.ID(taskID).String()},
+					})
+				}
+				return err
 			},
 			bus,
 			ids,
