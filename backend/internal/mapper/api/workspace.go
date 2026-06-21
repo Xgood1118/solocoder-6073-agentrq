@@ -340,7 +340,7 @@ func FromHTTPRequestToCreateCustomFieldRequest(c *fiber.Ctx) *entity.CreateCusto
 	if err := json.Unmarshal(c.BodyRaw(), &payload); err != nil {
 		return nil
 	}
-	workspaceID := monoflake.IDFromBase62(payload.Field.WorkspaceID).Int64()
+	workspaceID := monoflake.IDFromBase62(c.Params("workspaceId")).Int64()
 	if workspaceID == 0 || payload.Field.Name == "" {
 		return nil
 	}
@@ -372,7 +372,7 @@ func FromListCustomFieldsResponseEntityToHTTPResponse(rs *entity.ListCustomField
 }
 
 func FromHTTPRequestToUpdateCustomFieldRequest(c *fiber.Ctx) *entity.UpdateCustomFieldRequest {
-	fieldID := monoflake.IDFromBase62(c.Params("id")).Int64()
+	fieldID := monoflake.IDFromBase62(c.Params("fieldId")).Int64()
 	if fieldID == 0 {
 		return nil
 	}
@@ -380,8 +380,8 @@ func FromHTTPRequestToUpdateCustomFieldRequest(c *fiber.Ctx) *entity.UpdateCusto
 	if err := json.Unmarshal(c.BodyRaw(), &payload); err != nil {
 		return nil
 	}
-	workspaceID := monoflake.IDFromBase62(payload.Field.WorkspaceID).Int64()
-	if workspaceID == 0 {
+	workspaceID := monoflake.IDFromBase62(c.Params("workspaceId")).Int64()
+	if workspaceID == 0 || payload.Field.Name == "" {
 		return nil
 	}
 	return &entity.UpdateCustomFieldRequest{

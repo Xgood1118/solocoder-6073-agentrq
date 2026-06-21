@@ -531,7 +531,7 @@
                         </div>
                         <div class="space-y-2">
                           <label class="block text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Field Type</label>
-                          <select v-model="customFieldForm.type"
+                          <select v-model="customFieldForm.fieldType"
                                   class="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-sm px-4 py-3 text-sm focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none font-bold text-gray-900 dark:text-zinc-100 transition-all shadow-sm">
                             <option value="text">Text</option>
                             <option value="number">Number</option>
@@ -542,7 +542,7 @@
                         </div>
                       </div>
 
-                      <div v-if="customFieldForm.type === 'select' || customFieldForm.type === 'multiselect'" class="space-y-2">
+                      <div v-if="customFieldForm.fieldType === 'select' || customFieldForm.fieldType === 'multiselect'" class="space-y-2">
                         <label class="block text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Options (comma-separated)</label>
                         <input v-model="customFieldForm.optionsText" type="text" placeholder="e.g. Low, Medium, High, Critical"
                                class="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-sm px-4 py-3 text-sm focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none font-bold text-gray-900 dark:text-zinc-100 transition-all shadow-sm" />
@@ -565,15 +565,15 @@
                       <div v-for="field in customFields" :key="field.id" class="flex items-center justify-between p-4 bg-gray-50 dark:bg-zinc-800/50 rounded-sm border border-gray-100 dark:border-zinc-800 group hover:border-gray-900 dark:hover:border-white transition-all shadow-sm">
                         <div class="flex items-center gap-4 min-w-0">
                           <div class="p-2 bg-white dark:bg-zinc-800 rounded-sm shadow-sm border border-gray-100 dark:border-zinc-700 shrink-0">
-                            <svg v-if="field.type === 'text'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7" /></svg>
-                            <svg v-else-if="field.type === 'number'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
-                            <svg v-else-if="field.type === 'select' || field.type === 'multiselect'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 9l4-4 4 4m0 6l-4 4-4-4" /></svg>
-                            <svg v-else-if="field.type === 'date'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            <svg v-if="field.fieldType === 'text'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7" /></svg>
+                            <svg v-else-if="field.fieldType === 'number'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
+                            <svg v-else-if="field.fieldType === 'select' || field.fieldType === 'multiselect'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 9l4-4 4 4m0 6l-4 4-4-4" /></svg>
+                            <svg v-else-if="field.fieldType === 'date'" class="w-4 h-4 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                           </div>
                           <div class="flex flex-col gap-0.5 min-w-0">
                             <span class="text-xs font-bold text-gray-800 dark:text-zinc-200 truncate">{{ field.name }}</span>
                             <div class="flex items-center gap-2">
-                              <span class="text-[9px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">{{ field.type }}</span>
+                              <span class="text-[9px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">{{ field.fieldType }}</span>
                               <span v-if="field.options && field.options.length" class="text-[9px] text-gray-500 dark:text-zinc-500 font-medium">{{ field.options.join(', ') }}</span>
                             </div>
                           </div>
@@ -720,7 +720,7 @@ const deleteTemplateTarget = ref(null);
 
 const customFields = ref([]);
 const showCustomFieldForm = ref(false);
-const customFieldForm = ref({ name: '', type: 'text', optionsText: '' });
+const customFieldForm = ref({ name: '', fieldType: 'text', optionsText: '' });
 const editingCustomFieldId = ref(null);
 const savingCustomField = ref(false);
 const showDeleteCustomFieldConfirm = ref(false);
@@ -1120,7 +1120,7 @@ async function handleApplyTemplate(templateId) {
 async function loadCustomFields() {
   try {
     const res = await fetchCustomFields(workspaceId.value);
-    customFields.value = res.customFields || [];
+    customFields.value = res.fields || [];
   } catch (err) {
     notifyError('Failed to load custom fields: ' + err.message);
   }
@@ -1128,7 +1128,7 @@ async function loadCustomFields() {
 
 function openCustomFieldForm() {
   editingCustomFieldId.value = null;
-  customFieldForm.value = { name: '', type: 'text', optionsText: '' };
+  customFieldForm.value = { name: '', fieldType: 'text', optionsText: '' };
   showCustomFieldForm.value = true;
 }
 
@@ -1136,7 +1136,7 @@ function editCustomField(field) {
   editingCustomFieldId.value = field.id;
   customFieldForm.value = {
     name: field.name,
-    type: field.type,
+    fieldType: field.fieldType,
     optionsText: (field.options || []).join(', ')
   };
   showCustomFieldForm.value = true;
@@ -1145,7 +1145,7 @@ function editCustomField(field) {
 function cancelCustomFieldForm() {
   showCustomFieldForm.value = false;
   editingCustomFieldId.value = null;
-  customFieldForm.value = { name: '', type: 'text', optionsText: '' };
+  customFieldForm.value = { name: '', fieldType: 'text', optionsText: '' };
 }
 
 function parseOptions(optionsText, type) {
@@ -1162,8 +1162,8 @@ async function handleSaveCustomField() {
   try {
     const payload = {
       name: customFieldForm.value.name,
-      type: customFieldForm.value.type,
-      options: parseOptions(customFieldForm.value.optionsText, customFieldForm.value.type)
+      fieldType: customFieldForm.value.fieldType,
+      options: parseOptions(customFieldForm.value.optionsText, customFieldForm.value.fieldType)
     };
     if (editingCustomFieldId.value) {
       await updateCustomField(workspaceId.value, editingCustomFieldId.value, payload);

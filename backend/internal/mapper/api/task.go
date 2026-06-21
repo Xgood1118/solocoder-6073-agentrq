@@ -18,8 +18,13 @@ func FromHTTPRequestToCreateTaskRequestEntity(c *fiber.Ctx) *entity.CreateTaskRe
 		return nil
 	}
 	workspaceID := monoflake.IDFromBase62(c.Params("id")).Int64()
-	if workspaceID == 0 || payload.Task.Title == "" || payload.Task.CreatedBy == "" {
+	if workspaceID == 0 || payload.Task.Title == "" {
 		return nil
+	}
+
+	createdBy := payload.Task.CreatedBy
+	if createdBy == "" {
+		createdBy = "human"
 	}
 
 	var entityAttachments []entity.Attachment
@@ -41,7 +46,7 @@ func FromHTTPRequestToCreateTaskRequestEntity(c *fiber.Ctx) *entity.CreateTaskRe
 	return &entity.CreateTaskRequest{
 		Task: entity.Task{
 			WorkspaceID:      workspaceID,
-			CreatedBy:        payload.Task.CreatedBy,
+			CreatedBy:        createdBy,
 			Assignee:         payload.Task.Assignee,
 			Title:            payload.Task.Title,
 			Body:             payload.Task.Body,
